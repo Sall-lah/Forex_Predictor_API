@@ -1,0 +1,10 @@
+pandas
+numpy
+tensorflow
+scikit-learn
+ta
+joblib
+fastapi
+uvicorn
+python-dotenv
+pydantic
