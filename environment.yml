@@ -1,0 +1,28 @@
+name: forex_prediction
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Updated to Python 3.12 to match your successful check
+  - python=3.12
+  - pip
+  
+  # Heavy Data Science & Math (Updated to stable 2.x versions)
+  - pandas==2.2.2
+  - numpy==2.0.2
+  - scikit-learn==1.6.1
+  - joblib==1.5.3
+  
+  # Web Framework, ML, and Utilities
+  - pip:
+    - tensorflow==2.19.0     # Modern version compatible with NumPy 2.0
+    - ta==0.11.0
+    - fastapi
+    - uvicorn
+    - python-dotenv
+    - pydantic
+    - pydantic-settings
+    - httpx
+    - pytest
+    - pytest-cov
+    - pytest-mock
