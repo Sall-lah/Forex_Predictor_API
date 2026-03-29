@@ -15,6 +15,7 @@ import pytest
 
 from app.core.exceptions import (
     DataFetchError,
+    DataValidationError,
     InsufficientDataError,
     ModelNotLoadedError,
 )
@@ -305,3 +306,45 @@ def test_predict_different_asset(mocker):
     mock_preprocessor.assert_called_once()
     call_args = mock_preprocessor.call_args
     assert call_args[0][1] == "ETHUSD"
+
+
+def test_predict_invalid_model_output_raises_data_validation_error(mocker):
+    """Invalid predict_proba payloads should be surfaced as domain validation errors."""
+    service = PredictionService()
+    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+
+    mock_kraken_payload = {
+        "error": [],
+        "result": {
+            "XXBTZUSD": [
+                [
+                    1711000000,
+                    "50000.0",
+                    "51000.0",
+                    "49000.0",
+                    "50500.0",
+                    "50200.0",
+                    "100.5",
+                    150,
+                ],
+            ]
+            * 200,
+            "last": 1711000000,
+        },
+    }
+
+    mocker.patch.object(
+        service.api_client, "fetch_ohlcv_data", return_value=mock_kraken_payload
+    )
+    mocker.patch.object(
+        service.preprocessor,
+        "extract_features",
+        return_value=pd.DataFrame({"ema_9": [50000.0], "asset": ["BTCUSD"]}),
+    )
+
+    mock_model = Mock()
+    mock_model.predict_proba.return_value = [[0.95]]  # missing class-1 probability
+    mocker.patch.object(ModelLoader, "get_model", return_value=mock_model)
+
+    with pytest.raises(DataValidationError, match="Invalid model output"):
+        service.predict(request)
