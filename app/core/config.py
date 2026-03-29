@@ -1,36 +1,48 @@
 """
 Application-wide configuration loaded from environment variables.
 
-Why use pydantic-settings: Provides type-safe, validated config with
-automatic .env file loading, avoiding raw os.getenv() scattered across
-the codebase.
+Provides type-safe, validated config with automatic .env file loading.
 """
 
-from pydantic_settings import BaseSettings
 from functools import lru_cache
+from pathlib import Path
+
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     """
     Centralized application settings.
 
-    Values are loaded from environment variables or a `.env` file.
-    The `model_config` class var tells pydantic-settings where to
-    find the .env file and whether to treat variable names as
-    case-insensitive.
+    Values are loaded from environment variables or .env file.
+    Pydantic handles type conversion and validation automatically.
     """
 
+    # Application settings
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "info"
-    SECRET_KEY: str = "change-me-in-production"
 
+    # API settings
     API_VERSION: str = "v1"
     API_PREFIX: str = "/api/v1"
 
-    DATA_SOURCE_URL: str = "https://api.example.com/forex-data"
+    # Kraken API settings
+    KRAKEN_OHLC_URL: str = "https://api.kraken.com/0/public/OHLC"
+    KRAKEN_TIMEOUT: float = 15.0
+    KRAKEN_HOURLY_INTERVAL: int = 60
+    KRAKEN_DEFAULT_HOURS: int = 168
 
-    MODEL_PATH: str = "./model/bitcoin_lstm_model.keras"
-    SCALER_PATH: str = "./model/bitcoin_scaler.pkl"
+    # ML Model settings
+    MODEL_DIR: str = "app/features/prediction/ml_models"
+    MODEL_FILENAME: str = "lightgbm_model_forex.pkl"
+
+    # Feature extraction settings
+    MIN_ROWS_FOR_FEATURES: int = 168
+
+    @property
+    def model_path(self) -> Path:
+        """Compute full path to ML model file."""
+        return Path(self.MODEL_DIR) / self.MODEL_FILENAME
 
     model_config = {
         "env_file": ".env",
@@ -39,13 +51,11 @@ class Settings(BaseSettings):
     }
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """
-    Return a cached Settings singleton.
+    Return cached Settings singleton.
 
-    Why lru_cache: The settings object is immutable at runtime so we
-    avoid re-reading the .env file on every call.  FastAPI's Depends()
-    will invoke this once and reuse the result.
+    Settings are loaded once and reused across the application.
     """
     return Settings()

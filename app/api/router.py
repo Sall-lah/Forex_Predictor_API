@@ -9,6 +9,7 @@ new feature is a one-line import + include here.
 from fastapi import APIRouter
 
 from app.features.historic_data.router import router as historic_data_router
+from app.features.prediction.router import router as prediction_router
 
 api_router = APIRouter()
 
@@ -18,4 +19,8 @@ api_router.include_router(
     tags=["Historic Data"],
 )
 
-# Future: prediction router will be wired here in Phase 3.
+api_router.include_router(
+    prediction_router,
+    prefix="/prediction",
+    tags=["Prediction"],
+)

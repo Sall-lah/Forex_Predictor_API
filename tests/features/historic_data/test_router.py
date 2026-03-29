@@ -1,9 +1,8 @@
 """
 Tests for the HistoricDataFeature router endpoints.
 
-Why use dependency overrides: Decoupling the HTTP router from the
-heavy Pandas/TA underlying service logic allows us to verify FastAPI routing,
-schema serialization, and HTTP status codes cleanly and quickly.
+Tests verify FastAPI routing, schema serialization, and HTTP status codes
+by mocking the service layer using dependency overrides.
 """
 
 import pytest
@@ -11,71 +10,64 @@ from datetime import datetime, timezone
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.features.historic_data.router import get_historic_data_service
-from app.features.historic_data.schemas import HistoricDataResponse, EnrichedOHLCVRecord
+from app.features.historic_data.router import get_service
+from app.features.historic_data.schemas import HistoricDataResponse, OHLCVRecord
 
 # Initialize FastAPI TestClient
 client = TestClient(app)
 
 
 class MockHistoricDataService:
-    """Mock implementation returning predictable data for router assertion."""
-    
+    """Mock service returning predictable OHLCV data for testing."""
+
     def fetch_hourly_ohlcv(self, pair: str) -> HistoricDataResponse:
-        record = EnrichedOHLCVRecord(
+        """Return mock OHLCV data."""
+        record = OHLCVRecord(
             timestamp=datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc),
             open=50000.0,
             high=51000.0,
             low=49000.0,
             close=50500.0,
             volume=2.5,
-            sma=50200.0,
-            rsi=55.5,
-            macd=120.5,
-            macd_signal=100.0
         )
-        return HistoricDataResponse(
-            symbol=pair,
-            total_records=1,
-            data=[record]
-        )
+        return HistoricDataResponse(symbol=pair, total_records=1, data=[record])
 
 
-def override_get_historic_data_service():
+def override_service():
     """Dependency override factory."""
     return MockHistoricDataService()
 
 
 @pytest.fixture(autouse=True)
 def override_dependency():
-    """Automatically applies the mock to the FastAPI app for all tests in this file."""
-    app.dependency_overrides[get_historic_data_service] = override_get_historic_data_service
+    """Apply mock service to FastAPI app for all tests."""
+    app.dependency_overrides[get_service] = override_service
     yield
     app.dependency_overrides.clear()
 
 
 def test_get_live_data_endpoint():
     """
-    Verifies that the /live endpoint successfully calls our injected Service Class, 
-    packs the Pydantic models correctly, and returns a 200 JSON payload.
+    Verify /live endpoint returns correct OHLCV data.
+
+    Tests that the endpoint successfully calls the service,
+    serializes Pydantic models correctly, and returns 200 status.
     """
     pair = "XXBTZUSD"
-    # Ensure this matches the prefix routing registered in your app.api.router
     response = client.get(f"/api/v1/historic-data/live?pair={pair}")
-    
+
     assert response.status_code == 200
-    
+
     data = response.json()
     assert data["symbol"] == pair
     assert data["total_records"] == 1
     assert len(data["data"]) == 1
-    
-    # Assert values from the mocked service
+
+    # Verify OHLCV values from mocked service
     record = data["data"][0]
     assert record["open"] == 50000.0
+    assert record["high"] == 51000.0
+    assert record["low"] == 49000.0
     assert record["close"] == 50500.0
-    assert record["sma"] == 50200.0
-    assert record["rsi"] == 55.5
-    assert record["macd"] == 120.5
-    assert record["macd_signal"] == 100.0
+    assert record["volume"] == 2.5
     assert "timestamp" in record

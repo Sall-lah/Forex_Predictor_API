@@ -1,9 +1,9 @@
 """
 Tests for the HistoricDataService class.
 
-Why mock httpx: Network calls in unit tests lead to flaky, slow test suites. 
-We inject a mocked Kraken JSON response using pytest-mock so the focus remains 
-entirely on validating Pandas processing and TA indicator operations.
+Why mock httpx: Network calls in unit tests lead to flaky, slow test suites.
+We inject a mocked Kraken JSON response using pytest-mock so the focus remains
+entirely on validating data fetching and parsing operations.
 """
 
 import pytest
@@ -14,55 +14,69 @@ from app.core.exceptions import DataFetchError
 
 def test_fetch_hourly_ohlcv_success(mocker):
     """
-    Simulates a successful Kraken API response. Validate that the service 
-    correctly parses the nested JSON, creates a DataFrame, and processes 
-    indicators without reaching out to the live network.
+    Simulates a successful Kraken API response. Validate that the service
+    correctly parses the nested JSON, creates a DataFrame, and returns
+    OHLCV data without reaching out to the live network.
     """
     service = HistoricDataService()
     pair = "XXBTZUSD"
     base_time = 1711000000
     dummy_data = []
-    
-    # Generate 30 rows to satisfy the MACD lookback requirement (minimum 26 rows)
-    for i in range(30):
-        dummy_data.append([
-            base_time + i * 3600,                           # timestamp
-            "60000.0", "61000.0", "59000.0",                 # open, high, low
-            str(60000.0 + i * 10), "60000.0", "1.5", 10      # close, vwap, volume, count
-        ])
-    
+
+    # Generate sample OHLCV data
+    for i in range(168):  # 1 week of hourly data
+        o = 60000.0 + (i % 10) * 10
+        h = o + 500.0
+        l = o - 500.0
+        c = o + 100.0
+        dummy_data.append(
+            [
+                base_time + i * 3600,  # timestamp
+                str(o),
+                str(h),
+                str(l),
+                str(c),  # open, high, low, close
+                "60000.0",
+                "1.5",
+                10,  # vwap, volume, count
+            ]
+        )
+
     mock_payload = {
         "error": [],
-        "result": {
-            pair: dummy_data,
-            "last": base_time + 29 * 3600
-        }
+        "result": {pair: dummy_data, "last": base_time + 167 * 3600},
     }
-    
+
     mock_response = Mock()
     mock_response.json.return_value = mock_payload
     mock_response.raise_for_status.return_value = None
-    
+
     # Override httpx.get globally during this test
     mocker.patch("httpx.get", return_value=mock_response)
-    
+
     response = service.fetch_hourly_ohlcv(pair)
-    
-    # Assert
+
+    # Assert basic response structure
     assert response.symbol == pair
-    assert response.total_records == 30
-    assert len(response.data) == 30
-    
-    # Verify that indicators are correctly computed on the final record
+    assert response.total_records == 168
+    assert len(response.data) == 168
+
+    # Verify OHLCV data structure on first and last records
+    first_record = response.data[0]
+    assert first_record.timestamp is not None
+    assert first_record.open > 0
+    assert first_record.high > 0
+    assert first_record.low > 0
+    assert first_record.close > 0
+    assert first_record.volume >= 0
+
     last_record = response.data[-1]
-    assert last_record.sma is not None
-    assert isinstance(last_record.sma, float)
-    assert last_record.rsi is not None
-    assert isinstance(last_record.rsi, float)
-    assert last_record.macd is not None
-    assert isinstance(last_record.macd, float)
-    assert last_record.macd_signal is not None
-    assert isinstance(last_record.macd_signal, float)
+    assert last_record.timestamp is not None
+    assert last_record.open > 0
+    assert last_record.high > 0
+    assert last_record.low > 0
+    assert last_record.close > 0
+    assert last_record.volume >= 0
 
 
 def test_fetch_hourly_ohlcv_api_error(mocker):
@@ -72,14 +86,14 @@ def test_fetch_hourly_ohlcv_api_error(mocker):
     """
     service = HistoricDataService()
     pair = "INVALID"
-    
+
     mock_payload = {"error": ["EQuery:Unknown asset pair"]}
-    
+
     mock_response = Mock()
     mock_response.json.return_value = mock_payload
     mock_response.raise_for_status.return_value = None
-    
+
     mocker.patch("httpx.get", return_value=mock_response)
-    
-    with pytest.raises(DataFetchError, match="Kraken API returned an error"):
+
+    with pytest.raises(DataFetchError, match="Kraken API error"):
         service.fetch_hourly_ohlcv(pair)

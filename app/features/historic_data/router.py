@@ -1,9 +1,9 @@
 """
-Router for the Historic Data feature.
+API routes for Historic Data feature.
 
-Why keep business logic out: The router is a thin traffic controller.
-It delegates all computation to HistoricDataService, which is injected
-via FastAPI's Depends() so it can be swapped in tests.
+Endpoints:
+- GET /live: Fetch live OHLCV data from Kraken
+- POST /compute-indicators: Process OHLCV data
 """
 
 from fastapi import APIRouter, Depends, Query
@@ -17,13 +17,12 @@ from app.features.historic_data.service import HistoricDataService
 router = APIRouter()
 
 
-def get_historic_data_service() -> HistoricDataService:
+def get_service() -> HistoricDataService:
     """
-    Factory for dependency injection.
+    Dependency injection factory for HistoricDataService.
 
-    Why a factory function: FastAPI's Depends() can call this on
-    each request, making it trivial to override in tests with
-    app.dependency_overrides.
+    Returns:
+        New HistoricDataService instance
     """
     return HistoricDataService()
 
@@ -33,24 +32,27 @@ def get_historic_data_service() -> HistoricDataService:
     response_model=HistoricDataResponse,
     summary="Fetch live hourly OHLCV data from Kraken",
     description=(
-        "Calls the Kraken REST API to retrieve the last 30 days of hourly "
-        "OHLCV candles for the requested pair, enriches them with SMA(14), "
-        "RSI(14), MACD and MACD Signal indicators, and returns the result."
+        "Retrieves 1 week (168 hours) of hourly OHLCV candles from Kraken API. "
+        "Returns timestamp, open, high, low, close, and volume data."
     ),
 )
 async def get_live_data(
     pair: str = Query(
         ...,
-        description="Kraken asset-pair identifier, e.g. 'XXBTZUSD' or 'ETHUSD'.",
+        description="Kraken trading pair (e.g., 'XXBTZUSD', 'ETHUSD')",
         examples=["XXBTZUSD"],
     ),
-    service: HistoricDataService = Depends(get_historic_data_service),
+    service: HistoricDataService = Depends(get_service),
 ) -> HistoricDataResponse:
     """
-    Endpoint that fetches live data from Kraken and returns enriched records.
+    Fetch live OHLCV data from Kraken.
 
-    The service owns the HTTP call and all TA computation; this function
-    only bridges HTTP ↔ domain.
+    Args:
+        pair: Kraken asset pair identifier
+        service: Injected service instance
+
+    Returns:
+        Response with OHLCV records
     """
     return service.fetch_hourly_ohlcv(pair)
 
@@ -58,21 +60,24 @@ async def get_live_data(
 @router.post(
     "/compute-indicators",
     response_model=HistoricDataResponse,
-    summary="Compute technical indicators on OHLCV data",
+    summary="Process OHLCV data",
     description=(
-        "Accepts raw OHLCV candle data and returns the same records "
-        "enriched with Simple Moving Average (SMA), Relative "
-        "Strength Index (RSI), MACD, and MACD_signal columns."
+        "Accepts OHLCV candlestick data and validates it. "
+        "Returns the validated records."
     ),
 )
 async def compute_indicators(
     request: HistoricDataRequest,
-    service: HistoricDataService = Depends(get_historic_data_service),
+    service: HistoricDataService = Depends(get_service),
 ) -> HistoricDataResponse:
     """
-    Endpoint that receives OHLCV data and returns enriched records.
+    Process and validate OHLCV data.
 
-    The service handles all pandas/ta computation; this function
-    only bridges HTTP ↔ domain.
+    Args:
+        request: Request with OHLCV records
+        service: Injected service instance
+
+    Returns:
+        Response with validated OHLCV records
     """
     return service.compute_indicators(request)
