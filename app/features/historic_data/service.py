@@ -19,7 +19,6 @@ from app.core.exceptions import (
     InsufficientDataError,
 )
 from app.features.historic_data.schemas import (
-    HistoricDataRequest,
     HistoricDataResponse,
     OHLCVRecord,
 )
@@ -54,7 +53,7 @@ class KrakenAPIClient:
         Fetch raw OHLCV data from Kraken API.
 
         Args:
-            pair: Trading pair (e.g., "XXBTZUSD")
+            pair: Trading pair (e.g., "BTC/USD")
             hours: Hours of historical data to fetch
 
         Returns:
@@ -200,33 +199,6 @@ class OHLCVDataFrame:
         except (KeyError, ValueError, TypeError, StopIteration) as error:
             raise DataFetchError(f"Failed to parse Kraken response: {error}") from error
 
-    @classmethod
-    def from_records(cls, records: list[OHLCVRecord]) -> "OHLCVDataFrame":
-        """
-        Create OHLCVDataFrame from list of Pydantic records.
-
-        Args:
-            records: List of OHLCVRecord objects
-
-        Returns:
-            OHLCVDataFrame instance
-
-        Raises:
-            DataValidationError: If conversion fails
-        """
-        try:
-            serialized_records: list[dict] = []
-            for record in records:
-                if hasattr(record, "model_dump"):
-                    serialized_records.append(record.model_dump())
-                else:
-                    serialized_records.append(record.dict())
-
-            df = pd.DataFrame(serialized_records)
-            return cls(df)
-        except ValueError as error:
-            raise DataValidationError(f"Invalid record structure: {error}") from error
-
     def to_records(self) -> list[OHLCVRecord]:
         """
         Convert DataFrame to list of Pydantic records.
@@ -300,7 +272,7 @@ class HistoricDataService:
         Fetch 1 week of hourly OHLCV data from Kraken.
 
         Args:
-            pair: Kraken trading pair (e.g., "XXBTZUSD")
+            pair: Kraken trading pair (e.g., "BTC/USD")
 
         Returns:
             HistoricDataResponse with OHLCV records
@@ -328,39 +300,6 @@ class HistoricDataService:
 
         return HistoricDataResponse(
             symbol=pair,
-            total_records=len(records),
-            data=records,
-        )
-
-    def compute_indicators(self, request: HistoricDataRequest) -> HistoricDataResponse:
-        """
-        Process provided OHLCV data and return it.
-
-        Args:
-            request: Request containing OHLCV records
-
-        Returns:
-            HistoricDataResponse with validated OHLCV records
-
-        Raises:
-            InsufficientDataError: If insufficient data provided
-            DataValidationError: If data has structural issues
-        """
-        # Convert and validate
-        ohlcv_data = OHLCVDataFrame.from_records(request.records)
-        ohlcv_data.validate()
-
-        # Convert back to response format
-        records = ohlcv_data.to_records()
-
-        logger.info(
-            "Processed OHLCV data for %s — %d records",
-            request.symbol,
-            len(records),
-        )
-
-        return HistoricDataResponse(
-            symbol=request.symbol,
             total_records=len(records),
             data=records,
         )

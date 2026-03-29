@@ -3,7 +3,6 @@ Pydantic schemas for Historic Data feature.
 
 Models:
 - OHLCVRecord: Single candlestick data point
-- HistoricDataRequest: Request payload for processing OHLCV data
 - HistoricDataResponse: Response with OHLCV records
 """
 
@@ -50,26 +49,6 @@ class OHLCVRecord(BaseModel):
         ...,
         description="Trade volume in period",
         ge=0,
-    )
-
-
-class HistoricDataRequest(BaseModel):
-    """
-    Request for processing OHLCV data.
-
-    Contains symbol identifier and list of OHLCV records to process.
-    """
-
-    symbol: str = Field(
-        ...,
-        min_length=1,
-        description="Trading pair symbol (e.g., 'BTC/USD')",
-        examples=["BTC/USD"],
-    )
-    records: List[OHLCVRecord] = Field(
-        ...,
-        min_length=1,
-        description="OHLCV candles ordered by time (oldest first)",
     )
 
 

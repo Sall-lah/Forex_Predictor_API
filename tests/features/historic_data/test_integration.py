@@ -28,7 +28,7 @@ class TestKrakenLiveIntegration:
         """
         try:
             # We use TestClient from conftest.py
-            response = client.get("/api/v1/historic-data/live?pair=XXBTZUSD")
+            response = client.get("/api/v1/historic-data/live?pair=BTC/USD")
 
             # If the API returns a 502 or 503, it means Kraken is down or unreachable
             if response.status_code in (502, 503):

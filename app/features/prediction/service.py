@@ -135,7 +135,7 @@ class OHLCVPreprocessor:
     REQUIRED_COLUMNS = ["timestamp", "open", "high", "low", "close", "volume"]
 
     # Columns to drop after feature extraction
-    COLUMNS_TO_DROP = ["open", "high", "low", "close"]
+    COLUMNS_TO_DROP = ["timestamp", "open", "high", "low", "close"]
 
     def validate_input(self, df: pd.DataFrame) -> None:
         """
@@ -184,9 +184,6 @@ class OHLCVPreprocessor:
         # Make a copy to avoid modifying original
         df_features = df.copy()
 
-        # Add asset column
-        df_features["asset"] = asset
-
         # Compute features
         df_features = self._compute_trend_indicators(df_features)
         df_features = self._compute_momentum_indicators(df_features)
@@ -229,7 +226,7 @@ class OHLCVPreprocessor:
         df["adx"] = trend.ADXIndicator(high=high, low=low, close=close, window=14).adx()
 
         # Aroon Oscillator
-        df["aroon_osc"] = trend.AroonIndicator(close=close, window=25).aroon_indicator()
+        df['aroon_osc'] = trend.AroonIndicator(high, low).aroon_indicator()
 
         # Commodity Channel Index
         df["cci"] = trend.CCIIndicator(high=high, low=low, close=close, window=20).cci()

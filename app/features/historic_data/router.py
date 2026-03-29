@@ -3,15 +3,11 @@ API routes for Historic Data feature.
 
 Endpoints:
 - GET /live: Fetch live OHLCV data from Kraken
-- POST /compute-indicators: Process OHLCV data
 """
 
 from fastapi import APIRouter, Depends, Query
 
-from app.features.historic_data.schemas import (
-    HistoricDataRequest,
-    HistoricDataResponse,
-)
+from app.features.historic_data.schemas import HistoricDataResponse
 from app.features.historic_data.service import HistoricDataService
 
 router = APIRouter()
@@ -39,8 +35,8 @@ def get_service() -> HistoricDataService:
 async def get_live_data(
     pair: str = Query(
         ...,
-        description="Kraken trading pair (e.g., 'XXBTZUSD', 'ETHUSD')",
-        examples=["XXBTZUSD"],
+        description="Kraken trading pair (e.g., 'BTC/UDS', 'ETH/USD')",
+        examples=["BTC/USD"],
     ),
     service: HistoricDataService = Depends(get_service),
 ) -> HistoricDataResponse:
@@ -55,29 +51,3 @@ async def get_live_data(
         Response with OHLCV records
     """
     return service.fetch_hourly_ohlcv(pair)
-
-
-@router.post(
-    "/compute-indicators",
-    response_model=HistoricDataResponse,
-    summary="Process OHLCV data",
-    description=(
-        "Accepts OHLCV candlestick data and validates it. "
-        "Returns the validated records."
-    ),
-)
-async def compute_indicators(
-    request: HistoricDataRequest,
-    service: HistoricDataService = Depends(get_service),
-) -> HistoricDataResponse:
-    """
-    Process and validate OHLCV data.
-
-    Args:
-        request: Request with OHLCV records
-        service: Injected service instance
-
-    Returns:
-        Response with validated OHLCV records
-    """
-    return service.compute_indicators(request)
