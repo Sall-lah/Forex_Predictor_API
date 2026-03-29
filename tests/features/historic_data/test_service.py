@@ -7,9 +7,15 @@ entirely on validating data fetching and parsing operations.
 """
 
 import pytest
+import httpx
+import pandas as pd
 from unittest.mock import Mock
-from app.features.historic_data.service import HistoricDataService
-from app.core.exceptions import DataFetchError
+from app.core.exceptions import (
+    DataFetchError,
+    DataValidationError,
+    InsufficientDataError,
+)
+from app.features.historic_data.service import HistoricDataService, OHLCVDataFrame
 
 
 def test_fetch_hourly_ohlcv_success(mocker):
@@ -97,3 +103,49 @@ def test_fetch_hourly_ohlcv_api_error(mocker):
 
     with pytest.raises(DataFetchError, match="Kraken API error"):
         service.fetch_hourly_ohlcv(pair)
+
+
+def test_fetch_hourly_ohlcv_http_error_raises_domain_message(mocker):
+    """Ensure transport failures are mapped to a clear DataFetchError contract."""
+    service = HistoricDataService()
+
+    mocker.patch("httpx.get", side_effect=httpx.ConnectTimeout("timeout"))
+
+    with pytest.raises(
+        DataFetchError, match="Network error while fetching Kraken data"
+    ):
+        service.fetch_hourly_ohlcv("XXBTZUSD")
+
+
+def test_ohlcv_dataframe_validate_required_columns():
+    """Required-column validation should fail with domain exception."""
+    df = pd.DataFrame(
+        {
+            "timestamp": [pd.Timestamp("2024-01-01", tz="UTC")],
+            "open": [1.0],
+            "high": [2.0],
+            "low": [0.5],
+            "close": [1.5],
+            # volume intentionally omitted
+        }
+    )
+
+    with pytest.raises(DataValidationError, match="Missing required columns"):
+        OHLCVDataFrame(df).validate_columns()
+
+
+def test_ohlcv_dataframe_validate_minimum_rows():
+    """Row-count validation should enforce minimum size constraints."""
+    df = pd.DataFrame(
+        {
+            "timestamp": [pd.Timestamp("2024-01-01", tz="UTC")],
+            "open": [1.0],
+            "high": [2.0],
+            "low": [0.5],
+            "close": [1.5],
+            "volume": [10.0],
+        }
+    )
+
+    with pytest.raises(InsufficientDataError, match="2 required"):
+        OHLCVDataFrame(df).validate(min_rows=2)
