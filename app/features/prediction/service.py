@@ -19,7 +19,7 @@ from typing import Any, Literal
 import joblib
 import numpy as np
 import pandas as pd
-import ta
+from ta import momentum, trend, volatility
 
 from app.core.config import get_settings
 from app.core.exceptions import (
@@ -103,7 +103,7 @@ class ModelLoader:
             model = joblib.load(model_path)
             logger.info("LightGBM model loaded successfully")
             return model
-        except Exception as error:
+        except (OSError, ValueError, EOFError, ImportError, AttributeError) as error:
             raise ModelNotLoadedError(
                 f"Failed to load model from {model_path}: {error}"
             ) from error
@@ -221,42 +221,36 @@ class OHLCVPreprocessor:
         low = df["low"]
 
         # Exponential Moving Averages
-        df["ema_9"] = ta.trend.EMAIndicator(close=close, window=9).ema_indicator()
-        df["ema_21"] = ta.trend.EMAIndicator(close=close, window=21).ema_indicator()
-        df["ema_50"] = ta.trend.EMAIndicator(close=close, window=50).ema_indicator()
+        df["ema_9"] = trend.EMAIndicator(close=close, window=9).ema_indicator()
+        df["ema_21"] = trend.EMAIndicator(close=close, window=21).ema_indicator()
+        df["ema_50"] = trend.EMAIndicator(close=close, window=50).ema_indicator()
 
         # Average Directional Index
-        df["adx"] = ta.trend.ADXIndicator(
-            high=high, low=low, close=close, window=14
-        ).adx()
+        df["adx"] = trend.ADXIndicator(high=high, low=low, close=close, window=14).adx()
 
         # Aroon Oscillator
-        df["aroon_osc"] = ta.trend.AroonIndicator(
-            close=close, window=25
-        ).aroon_indicator()
+        df["aroon_osc"] = trend.AroonIndicator(close=close, window=25).aroon_indicator()
 
         # Commodity Channel Index
-        df["cci"] = ta.trend.CCIIndicator(
-            high=high, low=low, close=close, window=20
-        ).cci()
+        df["cci"] = trend.CCIIndicator(high=high, low=low, close=close, window=20).cci()
 
         # Vortex Indicator
-        vortex = ta.trend.VortexIndicator(high=high, low=low, close=close, window=14)
+        vortex = trend.VortexIndicator(high=high, low=low, close=close, window=14)
         df["vortex_indicator_pos"] = vortex.vortex_indicator_pos()
         df["vortex_indicator_neg"] = vortex.vortex_indicator_neg()
 
         # MACD
-        macd = ta.trend.MACD(close=close)
+        macd = trend.MACD(close=close)
         df["macd"] = macd.macd()
         df["macd_signal"] = macd.macd_signal()
 
         # KAMA
-        df["kama_indicator"] = ta.momentum.KAMAIndicator(
+        df["kama_indicator"] = momentum.KAMAIndicator(
             close=close, window=10, pow1=2, pow2=30
         ).kama()
 
         # Awesome Oscillator
-        df["awesome_oscillator"] = ta.momentum.AwesomeOscillatorIndicator(
+        df["awesome_oscillator"] = momentum.AwesomeOscillatorIndicator(
             high=high, low=low
         ).awesome_oscillator()
 
@@ -269,41 +263,41 @@ class OHLCVPreprocessor:
         low = df["low"]
 
         # RSI with different periods
-        df["rsi_21h"] = ta.momentum.RSIIndicator(close=close, window=21).rsi()
-        df["rsi_14h"] = ta.momentum.RSIIndicator(close=close, window=14).rsi()
-        df["rsi_7h"] = ta.momentum.RSIIndicator(close=close, window=7).rsi()
+        df["rsi_21h"] = momentum.RSIIndicator(close=close, window=21).rsi()
+        df["rsi_14h"] = momentum.RSIIndicator(close=close, window=14).rsi()
+        df["rsi_7h"] = momentum.RSIIndicator(close=close, window=7).rsi()
 
         # Rate of Change with different periods
-        df["roc_24h"] = ta.momentum.ROCIndicator(close=close, window=24).roc()
-        df["roc_12h"] = ta.momentum.ROCIndicator(close=close, window=12).roc()
-        df["roc_4h"] = ta.momentum.ROCIndicator(close=close, window=4).roc()
-        df["roc_2h"] = ta.momentum.ROCIndicator(close=close, window=2).roc()
-        df["roc_1h"] = ta.momentum.ROCIndicator(close=close, window=1).roc()
+        df["roc_24h"] = momentum.ROCIndicator(close=close, window=24).roc()
+        df["roc_12h"] = momentum.ROCIndicator(close=close, window=12).roc()
+        df["roc_4h"] = momentum.ROCIndicator(close=close, window=4).roc()
+        df["roc_2h"] = momentum.ROCIndicator(close=close, window=2).roc()
+        df["roc_1h"] = momentum.ROCIndicator(close=close, window=1).roc()
 
         # Williams %R
-        df["william_r"] = ta.momentum.WilliamsRIndicator(
+        df["william_r"] = momentum.WilliamsRIndicator(
             high=high, low=low, close=close, lbp=14
         ).williams_r()
 
         # Ultimate Oscillator
-        df["ultimate_oscillator"] = ta.momentum.UltimateOscillator(
+        df["ultimate_oscillator"] = momentum.UltimateOscillator(
             high=high, low=low, close=close
         ).ultimate_oscillator()
 
         # Stochastic Oscillator
-        stoch = ta.momentum.StochasticOscillator(
+        stoch = momentum.StochasticOscillator(
             high=high, low=low, close=close, window=14, smooth_window=3
         )
         df["stoch"] = stoch.stoch()
         df["stoch_signal"] = stoch.stoch_signal()
 
         # PPO
-        ppo = ta.momentum.PercentagePriceOscillator(close=close)
+        ppo = momentum.PercentagePriceOscillator(close=close)
         df["ppo"] = ppo.ppo()
         df["ppo_signal"] = ppo.ppo_signal()
 
         # Stochastic RSI
-        df["stoch_rsi"] = ta.momentum.StochRSIIndicator(
+        df["stoch_rsi"] = momentum.StochRSIIndicator(
             close=close, window=14, smooth1=3, smooth2=3
         ).stochrsi()
 
@@ -316,26 +310,24 @@ class OHLCVPreprocessor:
         low = df["low"]
 
         # Average True Range
-        df["atr"] = ta.volatility.AverageTrueRange(
+        df["atr"] = volatility.AverageTrueRange(
             high=high, low=low, close=close, window=14
         ).average_true_range()
 
         # Bollinger Bands
-        bollinger = ta.volatility.BollingerBands(close=close, window=20, window_dev=2)
+        bollinger = volatility.BollingerBands(close=close, window=20, window_dev=2)
         df["bollinger_wband"] = bollinger.bollinger_wband()
         df["bollinger_pband"] = bollinger.bollinger_pband()
 
         # Donchian Channel
-        donchian = ta.volatility.DonchianChannel(
+        donchian = volatility.DonchianChannel(
             high=high, low=low, close=close, window=20
         )
         df["donchian_channel_wband"] = donchian.donchian_channel_wband()
         df["donchian_channel_pband"] = donchian.donchian_channel_pband()
 
         # Keltner Channel
-        keltner = ta.volatility.KeltnerChannel(
-            high=high, low=low, close=close, window=20
-        )
+        keltner = volatility.KeltnerChannel(high=high, low=low, close=close, window=20)
         df["keltner_channel_hband"] = keltner.keltner_channel_hband()
 
         return df
@@ -353,7 +345,7 @@ class OHLCVPreprocessor:
         df["custom_hl_range_pct"] = ((high - low) / close) * 100
 
         # Trend consistency (close > EMA50 over last 24 periods)
-        ema_50 = ta.trend.EMAIndicator(close=close, window=50).ema_indicator()
+        ema_50 = trend.EMAIndicator(close=close, window=50).ema_indicator()
         df["custom_trend_consistency"] = (close > ema_50).rolling(
             window=24
         ).mean() * 100
@@ -408,7 +400,7 @@ class PredictionService:
         api_client: KrakenAPIClient | None = None,
         preprocessor: OHLCVPreprocessor | None = None,
         model_loader: ModelLoader | None = None,
-    ):
+    ) -> None:
         """
         Initialize service with optional dependencies.
 
@@ -437,42 +429,11 @@ class PredictionService:
             DataValidationError: If data validation fails
             ModelNotLoadedError: If ML model cannot be loaded
         """
-        # Step 1: Fetch OHLCV data from Kraken
-        logger.info("Fetching OHLCV data for '%s'", request.pair)
-        payload = self.api_client.fetch_ohlcv_data(
-            request.pair, settings.KRAKEN_DEFAULT_HOURS
-        )
-
-        # Step 2: Parse into DataFrame
-        ohlcv_data = OHLCVDataFrame.from_kraken_response(payload)
-        df = ohlcv_data.df
-
-        logger.info("Fetched %d hourly candles for '%s'", len(df), request.pair)
-
-        # Step 3: Extract features
-        logger.info("Extracting features for '%s'", request.asset)
-        df_features = self.preprocessor.extract_features(df, request.asset)
-
-        logger.info(
-            "Feature extraction completed: %d rows, %d features",
-            len(df_features),
-            len(df_features.columns),
-        )
-
-        # Step 4: Take the latest row for prediction
-        latest_features = df_features.iloc[[-1]]  # Keep as DataFrame for model input
-
-        # Step 5: Load model and make prediction
-        logger.info("Loading LightGBM model")
-        model = self.model_loader.get_model()
-
-        # Step 6: Predict probabilities
-        # predict_proba returns [[prob_class_0, prob_class_1]]
-        logger.info("Making prediction for '%s'", request.pair)
-        probabilities = model.predict_proba(latest_features)
-
-        # Extract probability of class 1 (upward movement)
-        prob_up = float(probabilities[0][1])
+        historic_df = self._fetch_historic_dataframe(request.pair)
+        feature_df = self._extract_features(historic_df, request)
+        latest_features = self._select_latest_feature_row(feature_df)
+        probabilities = self._predict_probabilities(request.pair, latest_features)
+        prob_up = self._extract_probability_up(probabilities)
 
         logger.info(
             "Prediction completed for '%s': probability_up=%.4f",
@@ -485,3 +446,67 @@ class PredictionService:
             asset=request.asset,
             probability_up=prob_up,
         )
+
+    def _fetch_historic_dataframe(self, pair: str) -> pd.DataFrame:
+        """Fetch and parse Kraken OHLCV payload into a DataFrame."""
+        logger.info("Fetching OHLCV data for '%s'", pair)
+        payload = self.api_client.fetch_ohlcv_data(pair, settings.KRAKEN_DEFAULT_HOURS)
+        ohlcv_data = OHLCVDataFrame.from_kraken_response(payload)
+
+        logger.info("Fetched %d hourly candles for '%s'", len(ohlcv_data.df), pair)
+        return ohlcv_data.df
+
+    def _extract_features(
+        self, historic_df: pd.DataFrame, request: PredictionRequest
+    ) -> pd.DataFrame:
+        """Extract model features for the requested asset."""
+        logger.info("Extracting features for '%s'", request.asset)
+        df_features = self.preprocessor.extract_features(historic_df, request.asset)
+        logger.info(
+            "Feature extraction completed: %d rows, %d features",
+            len(df_features),
+            len(df_features.columns),
+        )
+        return df_features
+
+    @staticmethod
+    def _select_latest_feature_row(feature_df: pd.DataFrame) -> pd.DataFrame:
+        """Select the latest feature row while preserving DataFrame shape."""
+        if feature_df.empty:
+            raise InsufficientDataError("No feature rows available for prediction")
+        return feature_df.iloc[[-1]]
+
+    def _predict_probabilities(self, pair: str, latest_features: pd.DataFrame) -> Any:
+        """Load model and obtain class-probability predictions."""
+        logger.info("Loading LightGBM model")
+        model = self.model_loader.get_model()
+
+        if not hasattr(model, "predict_proba"):
+            raise ModelNotLoadedError("Loaded model does not expose predict_proba")
+
+        logger.info("Making prediction for '%s'", pair)
+        return model.predict_proba(latest_features)
+
+    @staticmethod
+    def _extract_probability_up(probabilities: Any) -> float:
+        """Extract class-1 probability from model output with validation."""
+        try:
+            class_one_probability = probabilities[0][1]
+        except (TypeError, IndexError, KeyError) as error:
+            raise DataValidationError(
+                "Invalid model output: expected predict_proba[[class_0, class_1]]"
+            ) from error
+
+        try:
+            probability_up = float(class_one_probability)
+        except (TypeError, ValueError) as error:
+            raise DataValidationError(
+                "Invalid model output: class-1 probability must be numeric"
+            ) from error
+
+        if probability_up < 0.0 or probability_up > 1.0:
+            raise DataValidationError(
+                "Invalid model output: class-1 probability out of range [0, 1]"
+            )
+
+        return probability_up
