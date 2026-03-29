@@ -8,7 +8,6 @@ Architecture:
 """
 
 import logging
-from typing import List
 
 import httpx
 import pandas as pd
@@ -64,26 +63,49 @@ class KrakenAPIClient:
         Raises:
             DataFetchError: If request fails or API returns error
         """
-        since_timestamp = self._calculate_since_timestamp(hours)
+        query_params = self._build_query_params(pair=pair, hours=hours)
+        payload = self._request_payload(pair=pair, query_params=query_params)
+        self._validate_api_response(payload=payload, pair=pair)
+        return payload
 
+    def _build_query_params(self, pair: str, hours: int) -> dict[str, int | str]:
+        """Build Kraken OHLC query parameters for the requested pair and time range."""
+        return {
+            "pair": pair,
+            "interval": settings.KRAKEN_HOURLY_INTERVAL,
+            "since": self._calculate_since_timestamp(hours),
+        }
+
+    def _request_payload(self, pair: str, query_params: dict[str, int | str]) -> dict:
+        """Execute Kraken request and return the parsed JSON payload."""
         try:
             response = httpx.get(
                 self.base_url,
-                params={
-                    "pair": pair,
-                    "interval": settings.KRAKEN_HOURLY_INTERVAL,
-                    "since": since_timestamp,
-                },
+                params=query_params,
                 timeout=self.timeout,
             )
             response.raise_for_status()
-            payload = response.json()
-        except httpx.HTTPError as error:
+        except httpx.RequestError as error:
             raise DataFetchError(
-                f"Failed to fetch data for '{pair}': {error}"
+                f"Network error while fetching Kraken data for '{pair}': {error}"
+            ) from error
+        except httpx.HTTPStatusError as error:
+            raise DataFetchError(
+                f"HTTP error while fetching Kraken data for '{pair}': {error}"
             ) from error
 
-        self._validate_api_response(payload, pair)
+        try:
+            payload = response.json()
+        except ValueError as error:
+            raise DataFetchError(
+                f"Invalid JSON response from Kraken for '{pair}': {error}"
+            ) from error
+
+        if not isinstance(payload, dict):
+            raise DataFetchError(
+                f"Invalid payload shape from Kraken for '{pair}': expected object"
+            )
+
         return payload
 
     @staticmethod
@@ -102,6 +124,8 @@ class KrakenAPIClient:
         """
         if payload.get("error"):
             raise DataFetchError(f"Kraken API error for '{pair}': {payload['error']}")
+        if "result" not in payload:
+            raise DataFetchError(f"Kraken response for '{pair}' missing 'result' field")
 
 
 class OHLCVDataFrame:
@@ -168,8 +192,8 @@ class OHLCVDataFrame:
             # Keep only standard OHLCV columns
             df = df[["timestamp", "open", "high", "low", "close", "volume"]]
 
-            # Sort and reset index
-            df = df.sort_values(by="timestamp").reset_index(drop=True)
+            # Sort by timestamp and normalize positional index
+            df = df.set_index("timestamp").sort_index().reset_index(drop=False)
 
             return cls(df)
 
@@ -177,7 +201,7 @@ class OHLCVDataFrame:
             raise DataFetchError(f"Failed to parse Kraken response: {error}") from error
 
     @classmethod
-    def from_records(cls, records: List[OHLCVRecord]) -> "OHLCVDataFrame":
+    def from_records(cls, records: list[OHLCVRecord]) -> "OHLCVDataFrame":
         """
         Create OHLCVDataFrame from list of Pydantic records.
 
@@ -191,12 +215,19 @@ class OHLCVDataFrame:
             DataValidationError: If conversion fails
         """
         try:
-            df = pd.DataFrame([record.dict() for record in records])
+            serialized_records: list[dict] = []
+            for record in records:
+                if hasattr(record, "model_dump"):
+                    serialized_records.append(record.model_dump())
+                else:
+                    serialized_records.append(record.dict())
+
+            df = pd.DataFrame(serialized_records)
             return cls(df)
         except ValueError as error:
             raise DataValidationError(f"Invalid record structure: {error}") from error
 
-    def to_records(self) -> List[OHLCVRecord]:
+    def to_records(self) -> list[OHLCVRecord]:
         """
         Convert DataFrame to list of Pydantic records.
 
@@ -214,7 +245,7 @@ class OHLCVDataFrame:
         Raises:
             DataValidationError: If columns are missing
         """
-        missing = set(self.REQUIRED_COLUMNS) - set(self.df.columns)
+        missing = sorted(set(self.REQUIRED_COLUMNS) - set(self.df.columns))
         if missing:
             raise DataValidationError(f"Missing required columns: {', '.join(missing)}")
 
