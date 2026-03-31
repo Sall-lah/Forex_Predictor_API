@@ -39,6 +39,24 @@ class Settings(BaseSettings):
     # Feature extraction settings
     MIN_ROWS_FOR_FEATURES: int = 168
 
+    # Rate limit defaults
+    RATE_LIMIT_DEFAULT_CAPACITY: int = 60
+    RATE_LIMIT_DEFAULT_REFILL_RATE_PER_SECOND: float = 1.0
+
+    # Endpoint-specific rate limits
+    RATE_LIMIT_PREDICTION_CAPACITY: int = 10
+    RATE_LIMIT_PREDICTION_REFILL_RATE_PER_SECOND: float = 10 / 60
+    RATE_LIMIT_HISTORICAL_CAPACITY: int = 100
+    RATE_LIMIT_HISTORICAL_REFILL_RATE_PER_SECOND: float = 100 / 60
+
+    # Storage safety controls
+    RATE_LIMIT_STORAGE_MAX_ENTRIES: int = 100000
+    RATE_LIMIT_STORAGE_TTL_SECONDS: int = 3600
+
+    # Proxy and path controls
+    RATE_LIMIT_TRUSTED_PROXY_IPS: str = ""
+    RATE_LIMIT_EXEMPT_PATHS: str = "/health,/docs,/redoc,/openapi.json"
+
     @property
     def model_path(self) -> Path:
         """Compute full path to ML model file."""
