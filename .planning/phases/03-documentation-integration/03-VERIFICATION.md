@@ -1,71 +1,89 @@
 ---
 phase: 03-documentation-integration
-verified: 2026-03-31T22:00:27Z
+verified: 2026-03-31T22:15:07Z
 status: passed
 score: 3/3 must-haves verified
+re_verification:
+  previous_status: passed
+  previous_score: 3/3
+  gaps_closed: []
+  gaps_remaining: []
+  regressions: []
 ---
 
 # Phase 3: Documentation & Integration Verification Report
 
-**Phase Goal:** Complete documentation enabling future developers to understand, configure, and extend the rate limiter.
-**Verified:** 2026-03-31T22:00:27Z
+**Phase Goal:** Complete documentation enabling future developers to understand, configure, and extend the rate limiter
+**Verified:** 2026-03-31T22:15:07Z
 **Status:** passed
+**Re-verification:** No — initial verification mode (previous report existed, but no `gaps:` section)
 
 ## Goal Achievement
 
 ### Observable Truths
 
-| # | Truth | Status | Evidence |
-|---|-------|--------|----------|
-| 1 | Developer reading AGENTS.md can explain runtime middleware → service → bucket → storage flow and safe extension points | ✓ VERIFIED | `AGENTS.md` includes `Rate Limiter Architecture` with `app.main` → `RateLimitMiddleware.dispatch()` → `RateLimiterService.evaluate()` → `TokenBucket.consume()` + `InMemoryRateLimitStorage`, plus explicit boundary guidance |
-| 2 | Operator can configure default and per-endpoint limits with exact `RATE_LIMIT_*` vars without source exploration | ✓ VERIFIED | `docs/rate-limiter-configuration.md` includes all settings names and defaults from `app/core/config.py` with full `.env` example |
-| 3 | Developer/operator can identify exempt endpoints and anti-bypass rules (query/trailing slash/traversal, trusted proxy caveat) | ✓ VERIFIED | `docs/rate-limiter-configuration.md` has `Exempt Endpoints and Security Notes`; includes `/health`, `/docs`, `/redoc`, `/openapi.json`, normalization rules, traversal caveat, and trusted-proxy guidance |
+| #   | Truth | Status | Evidence |
+| --- | ----- | ------ | -------- |
+| 1 | Developer reading AGENTS.md can explain the runtime flow middleware → service → bucket → storage and where to extend behavior safely | ✓ VERIFIED | `AGENTS.md` contains `## Rate Limiter Architecture` and explicitly documents `app.main` → `RateLimitMiddleware.dispatch()` → `RateLimiterService.evaluate()` → `TokenBucket.consume()` + `InMemoryRateLimitStorage`; also includes “Do not move business logic into middleware.” |
+| 2 | Operator can configure default and per-endpoint limits using exact `RATE_LIMIT_*` vars without opening source code | ✓ VERIFIED | `docs/rate-limiter-configuration.md` includes `## Environment Variables` with all 10 rate-limit settings and defaults matching `app/core/config.py`, plus `.env` profile examples and validation commands. |
+| 3 | Developer/operator can identify exempt endpoints and exact exemption matching rules plus trusted-proxy caveats | ✓ VERIFIED | `docs/rate-limiter-configuration.md` includes `## Exempt Endpoints and Security Notes` listing `/health`, `/docs`, `/redoc`, `/openapi.json`, query-strip + trailing-slash normalization, traversal non-exemption, and trusted-proxy behavior. |
 
 **Score:** 3/3 truths verified
 
 ### Required Artifacts
 
 | Artifact | Expected | Status | Details |
-|----------|----------|--------|---------|
-| `AGENTS.md` | Architecture + extension guidance | ✓ EXISTS + SUBSTANTIVE | Includes both `Rate Limiter Architecture` and `Rate Limiter Extension Checklist` sections |
-| `docs/rate-limiter-configuration.md` | Env var + exemption guide | ✓ EXISTS + SUBSTANTIVE | Includes all rate-limit variables, profiles, validation commands, exemption/security notes |
-
-**Artifacts:** 2/2 verified
+| -------- | -------- | ------ | ------- |
+| `AGENTS.md` | Project-level developer guidance for architecture and extension patterns | ✓ VERIFIED | Exists; substantive sections present (`Rate Limiter Architecture`, `Rate Limiter Extension Checklist`); wired via concrete class/file references and cross-link to operator guide. |
+| `docs/rate-limiter-configuration.md` | Operator configuration/exemption guide with concrete env var defaults | ✓ VERIFIED | Exists; substantive env var matrix and `.env` snippets; wired to implementation (`_resolve_policy`, `RATE_LIMIT_*`, trusted proxy + exemption behavior). |
 
 ### Key Link Verification
 
 | From | To | Via | Status | Details |
-|------|----|----|--------|---------|
-| `AGENTS.md` | `app/middleware/rate_limit/service.py` | Architecture section maps responsibilities to concrete classes/files | ✓ WIRED | `verify key-links` reports `Pattern found in source` |
-| `docs/rate-limiter-configuration.md` | `app/core/config.py` | Env var names and defaults mirror Settings fields | ✓ WIRED | `verify key-links` reports `Pattern found in source` |
+| ---- | -- | --- | ------ | ------- |
+| `AGENTS.md` | `app/middleware/rate_limit/service.py` | Architecture section maps responsibilities to concrete classes/files | ✓ WIRED | `gsd-tools verify key-links` => verified, detail: `Pattern found in source` |
+| `docs/rate-limiter-configuration.md` | `app/core/config.py` | Environment variable names and defaults mirror Settings fields | ✓ WIRED | `gsd-tools verify key-links` => verified, detail: `Pattern found in source` |
 
-**Wiring:** 2/2 connections verified
+### Data-Flow Trace (Level 4)
 
-## Requirements Coverage
+| Artifact | Data Variable | Source | Produces Real Data | Status |
+| -------- | ------------- | ------ | ------------------ | ------ |
+| `AGENTS.md` | N/A (documentation artifact) | N/A | N/A | ? SKIP (non-runtime doc artifact) |
+| `docs/rate-limiter-configuration.md` | N/A (documentation artifact) | N/A | N/A | ? SKIP (non-runtime doc artifact) |
 
-| Requirement | Status | Blocking Issue |
-|-------------|--------|----------------|
-| DOCS-01 | ✓ SATISFIED | - |
-| DOCS-02 | ✓ SATISFIED | - |
-| DOCS-03 | ✓ SATISFIED | - |
+### Behavioral Spot-Checks
 
-**Coverage:** 3/3 requirements satisfied
+| Behavior | Command | Result | Status |
+| -------- | ------- | ------ | ------ |
+| Middleware exemption and header behavior remains valid with documented guidance | `pytest tests/middleware/rate_limit/test_middleware.py -k "exempt or headers" -x` | `5 passed, 4 deselected` | ✓ PASS |
+| AGENTS architecture assertions present | `python -c "...assert 'Rate Limiter Architecture'...'InMemoryRateLimitStorage'..."` | `AGENTS_OK` | ✓ PASS |
+| Config guide contains required env vars and run command | `python -c "...assert all required strings..."` | `DOCS_OK` | ✓ PASS |
 
-## Human Verification Required
+### Requirements Coverage
 
-None — all verification points were satisfied through documentation, artifact checks, and middleware regression tests.
+| Requirement | Source Plan | Description | Status | Evidence |
+| ----------- | ----------- | ----------- | ------ | -------- |
+| DOCS-01 | `03-01-PLAN.md` | Update AGENTS.md with rate limiting architecture and patterns | ✓ SATISFIED | `AGENTS.md` includes architecture flow, extension checklist, and boundary guidance aligned to runtime classes. |
+| DOCS-02 | `03-01-PLAN.md` | Configuration examples in docs (env vars, per-endpoint overrides) | ✓ SATISFIED | `docs/rate-limiter-configuration.md` includes all `RATE_LIMIT_*` variables, defaults, override mapping, `.env` profile, and validation commands. |
+| DOCS-03 | `03-01-PLAN.md` | Exemption endpoint configuration guide | ✓ SATISFIED | Same guide includes explicit exempt endpoints + anti-bypass/trusted-proxy notes; AGENTS cross-references this section. |
 
-## Gaps Summary
+Orphaned requirements for Phase 3: **None** (REQUIREMENTS Phase-3 mappings exactly match plan requirement IDs).
 
-**No gaps found.** Phase goal achieved. Ready to proceed.
+### Anti-Patterns Found
 
-## Verification Metadata
+| File | Line | Pattern | Severity | Impact |
+| ---- | ---- | ------- | -------- | ------ |
+| None | - | - | - | No TODO/FIXME/placeholder stub indicators found in phase-modified docs files. |
 
-**Verification approach:** Goal-backward + must-haves from `03-01-PLAN.md`
-**Automated checks:** 7 passed, 0 failed (`python` file checks, docs assertions, `pytest tests/middleware/rate_limit/test_middleware.py -k "exempt or headers" -x`, `verify artifacts`, `verify key-links`)
-**Human checks required:** 0
-**Total verification time:** 3 min
+### Human Verification Required
+
+None.
+
+### Gaps Summary
+
+No gaps found. All must-haves are present, substantive, and correctly linked to implementation details.
 
 ---
-*Verified: 2026-03-31T22:00:27Z*
-*Verifier: gsd-executor (inline orchestration execution)*
+
+_Verified: 2026-03-31T22:15:07Z_
+_Verifier: the agent (gsd-verifier)_

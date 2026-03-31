@@ -208,7 +208,13 @@ class OHLCVDataFrame:
         """
         # Replace NaN with None for JSON serialization
         clean_df = self.df.where(pd.notnull(self.df), None)
-        return [OHLCVRecord(**row) for row in clean_df.to_dict(orient="records")]
+        final_records = []
+
+        for row in clean_df.to_dict(orient="records"):
+            record_object = OHLCVRecord(**row)
+            final_records.append(record_object)
+
+        return final_records
 
     def validate_columns(self) -> None:
         """

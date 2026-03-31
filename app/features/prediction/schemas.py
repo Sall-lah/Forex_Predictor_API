@@ -21,8 +21,8 @@ class PredictionRequest(BaseModel):
     pair: str = Field(
         ...,
         min_length=1,
-        description="Kraken trading pair (e.g., 'XXBTZUSD' for BTC/USD)",
-        examples=["XXBTZUSD", "XETHZUSD"],
+        description="Kraken trading pair (e.g., 'BTC/USD' for BTCUSD)",
+        examples=["BTC/USD", "ETH/USD"],
     )
     asset: Literal["BTCUSD", "ETHUSD"] = Field(
         ...,
