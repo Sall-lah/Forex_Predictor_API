@@ -77,6 +77,67 @@ def test_service_uses_forwarded_ip_only_for_trusted_proxy() -> None:
     assert service._resolve_client_ip(request_untrusted) == "192.0.2.55"
 
 
+def test_service_resolves_client_ip_from_trusted_proxy_chain() -> None:
+    """Trusted proxy chain should resolve to first untrusted hop from the right."""
+    settings = _build_settings().model_copy(
+        update={"RATE_LIMIT_TRUSTED_PROXY_IPS": "10.0.0.1,10.0.0.2"}
+    )
+    service = RateLimiterService(settings=settings)
+
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/api/v1/prediction/predict",
+            "headers": [
+                (
+                    b"x-forwarded-for",
+                    b"203.0.113.250, 198.51.100.20, 10.0.0.2",
+                )
+            ],
+            "client": ("10.0.0.1", 5555),
+        }
+    )
+
+    assert service._resolve_client_ip(request) == "198.51.100.20"
+
+
+def test_service_normalizes_exempt_paths_without_allowing_traversal() -> None:
+    """Exempt matching should normalize slash/query but not traversal-like variants."""
+    service = RateLimiterService(settings=_build_settings())
+
+    assert service._is_exempt_path("/health/") is True
+    assert service._is_exempt_path("/health?source=probe") is True
+    assert service._is_exempt_path("/health/../api/v1/prediction/predict") is False
+
+
+def test_untrusted_client_cannot_bypass_limits_by_rotating_forwarded_ip() -> None:
+    """Forged XFF headers from untrusted sockets should not evade per-IP limits."""
+    app = FastAPI()
+    app.state.rate_limiter_service = RateLimiterService(settings=_build_settings())
+
+    @app.get("/api/v1/prediction/predict")
+    async def prediction() -> dict[str, str]:
+        return {"status": "ok"}
+
+    app.add_middleware(RateLimitMiddleware)
+    client = TestClient(app)
+
+    first = client.get(
+        "/api/v1/prediction/predict", headers={"X-Forwarded-For": "198.51.100.1"}
+    )
+    second = client.get(
+        "/api/v1/prediction/predict", headers={"X-Forwarded-For": "198.51.100.2"}
+    )
+    denied = client.get(
+        "/api/v1/prediction/predict", headers={"X-Forwarded-For": "198.51.100.3"}
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert denied.status_code == 429
+
+
 def test_service_bypasses_exempt_paths() -> None:
     """Operational paths should bypass rate limiting."""
     app = FastAPI()
