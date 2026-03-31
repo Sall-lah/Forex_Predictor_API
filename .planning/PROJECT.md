@@ -12,30 +12,41 @@ Protect API endpoints from abuse while maintaining excellent developer experienc
 
 ### Validated
 
-- [x] Documentation in AGENTS.md for future development *(Validated in Phase 3: Documentation & Integration)*
-- [x] Environment-variable configuration for all rate limits *(Validated in Phase 3: Documentation & Integration)*
-- [x] Per-endpoint limit overrides via configuration *(Validated in Phase 3: Documentation & Integration)*
-- [x] Configurable exemptions for health checks, docs, and static endpoints *(Validated in Phase 3: Documentation & Integration)*
+- [x] Token bucket algorithm with accurate refill logic *(Validated in v1.0, Phase 1)*
+- [x] Per-IP client identification with trusted-proxy-aware X-Forwarded-For handling *(Validated in v1.0, Phases 1-2)*
+- [x] Per-endpoint rate-limit configuration (predict/historical/default policies) *(Validated in v1.0, Phases 1-3)*
+- [x] In-memory rate-limit storage with async-safe atomic updates *(Validated in v1.0, Phases 1-2)*
+- [x] FastAPI middleware integration for automatic global protection *(Validated in v1.0, Phase 1)*
+- [x] HTTP 429 responses with structured JSON error body *(Validated in v1.0, Phase 1)*
+- [x] X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset headers *(Validated in v1.0, Phases 1-2)*
+- [x] Retry-After header on denied responses *(Validated in v1.0, Phase 1)*
+- [x] Modular implementation in `app/middleware/rate_limit/` *(Validated in v1.0, Phase 1)*
+- [x] Clear layer separation: middleware -> service -> bucket + storage *(Validated in v1.0, Phases 1-3)*
+- [x] Full type hints and typed decision/config contracts *(Validated in v1.0, Phases 1-3)*
+- [x] Security and performance test coverage (spoofing, concurrency, memory) *(Validated in v1.0, Phase 2)*
+- [x] Documentation in AGENTS.md for architecture and extension checklist *(Validated in v1.0, Phase 3)*
+- [x] Environment-variable configuration guide with per-endpoint overrides *(Validated in v1.0, Phase 3)*
+- [x] Exemption endpoint and anti-bypass configuration guide *(Validated in v1.0, Phase 3)*
 
 ### Active
 
-- [ ] Token bucket algorithm implementation with accurate refill logic
-- [ ] Per-IP client identification with proper X-Forwarded-For handling
-- [ ] Per-endpoint rate limit configuration (different limits per route)
-- [ ] In-memory storage for rate limit state (single instance deployment)
-- [ ] FastAPI middleware integration with automatic application to all routes
-- [ ] 429 Too Many Requests responses with detailed error messages
-- [ ] X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset headers
-- [ ] Retry-After header in 429 responses
-- [ ] Modular file structure in dedicated app/middleware/rate_limit/ directory
-- [ ] Clean separation: bucket logic, storage abstraction, middleware layer
-- [ ] Full type hints with Pydantic models for configuration
-- [ ] Comprehensive test coverage: happy path, limit exceeded, bucket refill, concurrent requests
-- [ ] Integration with existing domain exception patterns
+None for v1.0.
+
+## Next Milestone Goals
+
+- [ ] Improve operational observability (rate-limit events and metrics endpoints)
+- [ ] Explore storage abstraction path toward Redis-backed distributed limiting
+- [ ] Evaluate advanced headers (`RateLimit-Policy`, usage headers) for standards alignment
+- [ ] Add regression guardrails for documentation/implementation drift in milestone transitions
 
 ## Current State
 
-Phase 3 is complete: rate-limiter architecture flow, extension checklist, operator env-var configuration examples, and exemption anti-bypass guidance are documented and cross-referenced.
+v1.0 is shipped and archived. The API has production-ready token-bucket rate limiting with:
+- per-IP enforcement and trusted-proxy-aware client identity
+- per-endpoint configurable limits and exempt-path handling
+- consistent deny/allow headers and 429 contracts
+- concurrency/performance/memory validation harnesses
+- architecture and operator documentation for extension and operations
 
 ### Out of Scope
 
@@ -48,16 +59,14 @@ Phase 3 is complete: rate-limiter architecture flow, extension checklist, operat
 ## Context
 
 **Current State:**
-- Forex Predictor API is a working FastAPI application with feature-based architecture
-- No rate limiting currently exists (API is unprotected)
-- Existing patterns: routers → services → schemas, domain exceptions, dependency injection
-- Testing infrastructure uses pytest with fixtures and mocking
-- Configuration via pydantic-settings and .env files
+- Forex Predictor API is protected by global rate-limit middleware and endpoint policy routing.
+- Existing feature architecture is preserved (routers -> services -> schemas) while middleware remains a cross-cutting concern.
+- Security and correctness safeguards are validated with focused middleware, bucket, storage, and performance tests.
+- Configuration remains environment-driven through `app/core/config.py` and documented operator examples.
 
-**Why Now:**
-- Building proper API hygiene from the start (best practice)
-- Want production-ready protection before expanding usage
-- Clean code and structured organization are priorities
+**Why Next:**
+- v1.0 proves correctness and documentation quality; next focus is operational maturity and scale readiness.
+- Future work should preserve current guarantees while improving observability and distributed deployment options.
 
 **User Needs:**
 - Per-endpoint flexibility (expensive prediction endpoints get stricter limits)
@@ -86,13 +95,13 @@ Phase 3 is complete: rate-limiter architecture flow, extension checklist, operat
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Token bucket over fixed window | More forgiving for bursty traffic; industry standard (AWS, Stripe use it) | — Pending |
-| Per-IP identification | Simpler than API keys; sufficient protection without auth system | — Pending |
-| In-memory storage | Single instance deployment; acceptable to reset on restart; no external dependencies | — Pending |
-| Per-endpoint limits | Expensive prediction endpoints need stricter limits than health checks | — Pending |
-| Middleware + exemptions | Automatic protection for all routes; explicit exemptions for operational endpoints | — Pending |
-| Environment configuration | Operators can tune limits without code changes; follows existing config pattern | — Pending |
-| Modular middleware/ directory | Clean separation from features/; dedicated location for cross-cutting concerns | — Pending |
+| Token bucket over fixed window | More forgiving for bursty traffic; industry standard (AWS, Stripe use it) | ✓ Good (v1.0) |
+| Per-IP identification | Simpler than API keys; sufficient protection without auth system | ✓ Good (v1.0) |
+| In-memory storage | Single instance deployment; acceptable to reset on restart; no external dependencies | ✓ Good (v1.0, revisit for distributed v2) |
+| Per-endpoint limits | Expensive prediction endpoints need stricter limits than health checks | ✓ Good (v1.0) |
+| Middleware + exemptions | Automatic protection for all routes; explicit exemptions for operational endpoints | ✓ Good (v1.0) |
+| Environment configuration | Operators can tune limits without code changes; follows existing config pattern | ✓ Good (v1.0) |
+| Modular middleware/ directory | Clean separation from features/; dedicated location for cross-cutting concerns | ✓ Good (v1.0) |
 
 ## Evolution
 
@@ -112,4 +121,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-03-31 after Phase 3 completion*
+*Last updated: 2026-03-31 after v1.0 milestone completion*

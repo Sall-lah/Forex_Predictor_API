@@ -1,6 +1,7 @@
 .agents
 .env
 AGENTS.md
-.planning
+.planning/codebase/
+CLAUDE.md
 # app/features/prediction/ml_models/MODEL_USAGE.md
 # app/features/prediction/ml_models/OHLCV_PREPROCESS.md
