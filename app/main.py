@@ -19,6 +19,7 @@ from app.core.exceptions import (
     InsufficientDataError,
     ModelNotLoadedError,
 )
+from app.middleware.rate_limit.middleware import RateLimitMiddleware
 from app.api.router import api_router
 
 settings = get_settings()
@@ -35,13 +36,18 @@ app = FastAPI(
     version="0.1.0",
 )
 
+app.add_middleware(RateLimitMiddleware)
+
 
 # ---------------------------------------------------------------------------
 # Global Exception Handlers
 # ---------------------------------------------------------------------------
 
+
 @app.exception_handler(ModelNotLoadedError)
-async def model_not_loaded_handler(_request: Request, exc: ModelNotLoadedError) -> JSONResponse:
+async def model_not_loaded_handler(
+    _request: Request, exc: ModelNotLoadedError
+) -> JSONResponse:
     """Return 503 when the ML model is unavailable."""
     logger.error("ModelNotLoadedError: %s", exc.message)
     return JSONResponse(
@@ -61,7 +67,9 @@ async def data_fetch_handler(_request: Request, exc: DataFetchError) -> JSONResp
 
 
 @app.exception_handler(DataValidationError)
-async def data_validation_handler(_request: Request, exc: DataValidationError) -> JSONResponse:
+async def data_validation_handler(
+    _request: Request, exc: DataValidationError
+) -> JSONResponse:
     """Return 422 when domain validation fails (beyond Pydantic)."""
     logger.warning("DataValidationError: %s", exc.message)
     return JSONResponse(
@@ -71,7 +79,9 @@ async def data_validation_handler(_request: Request, exc: DataValidationError) -
 
 
 @app.exception_handler(InsufficientDataError)
-async def insufficient_data_handler(_request: Request, exc: InsufficientDataError) -> JSONResponse:
+async def insufficient_data_handler(
+    _request: Request, exc: InsufficientDataError
+) -> JSONResponse:
     """Return 422 when the payload does not contain enough rows."""
     logger.warning("InsufficientDataError: %s", exc.message)
     return JSONResponse(
