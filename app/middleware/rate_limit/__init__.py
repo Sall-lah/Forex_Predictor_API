@@ -1,5 +1,6 @@
 """Rate limiting module exports."""
 
+from app.middleware.rate_limit.bucket import TokenBucket
 from app.middleware.rate_limit.schemas import (
     RateLimitDecision,
     RateLimitPolicy,
@@ -7,6 +8,7 @@ from app.middleware.rate_limit.schemas import (
 )
 
 __all__ = [
+    "TokenBucket",
     "RateLimitDecision",
     "RateLimitPolicy",
     "RateLimitState",
