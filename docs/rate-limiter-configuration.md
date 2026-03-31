@@ -74,3 +74,23 @@ Start the app locally and exercise prediction/historical routes:
 ```bash
 uvicorn app.main:app --reload
 ```
+
+## Exempt Endpoints and Security Notes
+
+Default exempt endpoints (from `RATE_LIMIT_EXEMPT_PATHS`) are:
+
+- `/health`
+- `/docs`
+- `/redoc`
+- `/openapi.json`
+
+Path matching rules in `RateLimiterService`:
+
+- Query string is stripped before exemption check (for example, `/health?source=probe` still matches `/health`).
+- Trailing slash is normalized (`/health/` is treated as `/health`).
+- Matching is exact after normalization; traversal-like variants are **not** exempt (for example, `/health/../api/v1/prediction/predict`).
+
+Security caveat for client identity:
+
+- `X-Forwarded-For` is trusted only when the direct socket IP is in `RATE_LIMIT_TRUSTED_PROXY_IPS`.
+- When changing exemption or trusted-proxy logic, add/adjust regression tests in `tests/middleware/rate_limit/test_middleware.py` for spoofing and exemption-bypass scenarios.

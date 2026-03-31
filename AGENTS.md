@@ -259,6 +259,8 @@ When adding/changing rate-limiting behavior, use this checklist to preserve arch
    - Update `docs/rate-limiter-configuration.md` (`Exempt Endpoints and Security Notes`).
    - Add regression tests that cover proxy spoofing and exemption bypass edge cases.
 
+For exemption behavior details and anti-bypass rules, always consult `docs/rate-limiter-configuration.md` (`Exempt Endpoints and Security Notes`) before modifying `RateLimiterService` path/proxy logic.
+
 ## Common Pitfalls to Avoid
 
 - ❌ Don't use `iterrows()` or row-by-row operations—use pandas vectorization
