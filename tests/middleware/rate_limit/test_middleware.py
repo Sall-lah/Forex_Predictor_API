@@ -202,3 +202,33 @@ def test_middleware_includes_limit_headers_on_allowed_responses() -> None:
     assert int(second.headers["X-RateLimit-Remaining"]) <= int(
         first.headers["X-RateLimit-Remaining"]
     )
+
+
+def test_middleware_headers_remain_consistent_across_allow_then_deny() -> None:
+    """Rate-limit headers should remain internally consistent across transitions."""
+    app = FastAPI()
+    app.state.rate_limiter_service = RateLimiterService(settings=_build_settings())
+
+    @app.get("/api/v1/prediction/predict")
+    async def prediction() -> dict[str, str]:
+        return {"status": "ok"}
+
+    app.add_middleware(RateLimitMiddleware)
+    client = TestClient(app)
+
+    first = client.get("/api/v1/prediction/predict")
+    second = client.get("/api/v1/prediction/predict")
+    denied = client.get("/api/v1/prediction/predict")
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert denied.status_code == 429
+
+    assert first.headers["X-RateLimit-Limit"] == "2"
+    assert second.headers["X-RateLimit-Limit"] == "2"
+    assert denied.headers["X-RateLimit-Limit"] == "2"
+
+    assert int(first.headers["X-RateLimit-Remaining"]) == 1
+    assert int(second.headers["X-RateLimit-Remaining"]) == 0
+    assert int(denied.headers["X-RateLimit-Remaining"]) == 0
+    assert int(denied.headers["Retry-After"]) >= 1
