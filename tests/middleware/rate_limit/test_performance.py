@@ -6,7 +6,9 @@ This module focuses on correctness-first stress tests:
 """
 
 import asyncio
+import os
 import time
+import tracemalloc
 
 import pytest
 from starlette.requests import Request
@@ -130,3 +132,64 @@ def test_throughput_batch_accounting_stays_consistent_under_load() -> None:
     assert allowed_count <= 2_500
     assert denied_count >= 2_500
     assert elapsed < 10.0
+
+
+@pytest.mark.ratelimit_perf
+def test_memory_smoke_rotating_clients_stays_bounded_with_cleanup() -> None:
+    """Rotating-client smoke workload should remain bounded after cleanup."""
+    service = RateLimiterService(settings=_build_perf_settings())
+    service._bucket = TokenBucket(now_func=FixedClock(now=3000.0).now)
+
+    async def run_workload() -> int:
+        for index in range(12_000):
+            request = _build_request(
+                "/api/v1/prediction/predict",
+                client_ip=f"192.0.2.{index % 800}",
+            )
+            _ = await service.evaluate(request)
+
+        removed = await service._storage.cleanup_expired(now_monotonic=1_000_000.0)
+        return removed
+
+    tracemalloc.start()
+    start_snapshot = tracemalloc.take_snapshot()
+    removed = asyncio.run(run_workload())
+    end_snapshot = tracemalloc.take_snapshot()
+    tracemalloc.stop()
+
+    stats = end_snapshot.compare_to(start_snapshot, "lineno")
+    total_alloc_diff = sum(stat.size_diff for stat in stats)
+
+    assert removed > 0
+    assert len(service._storage._states) == 0
+    assert total_alloc_diff < 8_000_000
+
+
+@pytest.mark.ratelimit_soak
+def test_memory_soak_mode_runs_only_when_enabled() -> None:
+    """Optional soak profile runs only with RATE_LIMIT_SOAK=1.
+
+    Run explicitly:
+        RATE_LIMIT_SOAK=1 pytest tests/middleware/rate_limit/test_performance.py -k "soak" -x
+    """
+    if os.getenv("RATE_LIMIT_SOAK") != "1":
+        pytest.skip("Set RATE_LIMIT_SOAK=1 to run long-run soak validation.")
+
+    service = RateLimiterService(settings=_build_perf_settings())
+    service._bucket = TokenBucket(now_func=FixedClock(now=4000.0).now)
+
+    async def run_soak() -> int:
+        for index in range(100_000):
+            request = _build_request(
+                "/api/v1/prediction/predict",
+                client_ip=f"198.51.100.{index % 1000}",
+            )
+            _ = await service.evaluate(request)
+
+        removed = await service._storage.cleanup_expired(now_monotonic=2_000_000.0)
+        return removed
+
+    removed = asyncio.run(run_soak())
+
+    assert removed > 0
+    assert len(service._storage._states) == 0
