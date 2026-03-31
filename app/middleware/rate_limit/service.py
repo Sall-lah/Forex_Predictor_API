@@ -32,7 +32,10 @@ class RateLimiterService:
         self._trusted_proxies = self._parse_csv_set(
             self._settings.RATE_LIMIT_TRUSTED_PROXY_IPS
         )
-        self._exempt_paths = self._parse_csv_set(self._settings.RATE_LIMIT_EXEMPT_PATHS)
+        self._exempt_paths = {
+            self._normalize_path(path)
+            for path in self._parse_csv_set(self._settings.RATE_LIMIT_EXEMPT_PATHS)
+        }
         self._state_lock = asyncio.Lock()
 
     @staticmethod
@@ -40,9 +43,17 @@ class RateLimiterService:
         """Parse comma-separated values into trimmed unique strings."""
         return {value.strip() for value in raw_value.split(",") if value.strip()}
 
+    @staticmethod
+    def _normalize_path(path: str) -> str:
+        """Normalize path for exact matching without traversal resolution."""
+        raw_path = path.split("?", maxsplit=1)[0].strip() or "/"
+        if raw_path != "/":
+            return raw_path.rstrip("/")
+        return raw_path
+
     def _is_exempt_path(self, path: str) -> bool:
         """Return true when the request path is configured as exempt."""
-        return path in self._exempt_paths
+        return self._normalize_path(path) in self._exempt_paths
 
     def _resolve_client_ip(self, request: Request) -> str:
         """Resolve effective client IP with trusted-proxy anti-spoofing rules."""
@@ -54,8 +65,15 @@ class RateLimiterService:
         if not forwarded_for.strip():
             return direct_ip
 
-        real_ip = forwarded_for.split(",", maxsplit=1)[0].strip()
-        return real_ip or direct_ip
+        forwarded_chain = [ip.strip() for ip in forwarded_for.split(",") if ip.strip()]
+        if not forwarded_chain:
+            return direct_ip
+
+        for candidate_ip in reversed(forwarded_chain):
+            if candidate_ip not in self._trusted_proxies:
+                return candidate_ip
+
+        return forwarded_chain[0]
 
     def _resolve_policy(self, path: str) -> tuple[str, RateLimitPolicy]:
         """Map request path to endpoint-specific or default policy."""
