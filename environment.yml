@@ -15,6 +15,7 @@ dependencies:
   
   # Web Framework, ML, and Utilities
   - pip:
+    - lightgbm==4.6.0
     - ta==0.11.0
     - fastapi
     - uvicorn
