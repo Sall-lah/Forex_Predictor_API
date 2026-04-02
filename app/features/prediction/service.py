@@ -226,7 +226,7 @@ class OHLCVPreprocessor:
         df["adx"] = trend.ADXIndicator(high=high, low=low, close=close, window=14).adx()
 
         # Aroon Oscillator
-        df['aroon_osc'] = trend.AroonIndicator(high, low).aroon_indicator()
+        df["aroon_osc"] = trend.AroonIndicator(high, low).aroon_indicator()
 
         # Commodity Channel Index
         df["cci"] = trend.CCIIndicator(high=high, low=low, close=close, window=20).cci()
@@ -447,7 +447,7 @@ class PredictionService:
     def _fetch_historic_dataframe(self, pair: str) -> pd.DataFrame:
         """Fetch and parse Kraken OHLCV payload into a DataFrame."""
         logger.info("Fetching OHLCV data for '%s'", pair)
-        payload = self.api_client.fetch_ohlcv_data(pair, settings.KRAKEN_DEFAULT_HOURS)
+        payload = self.api_client.fetch_ohlcv_data(pair, settings.PREDICTION_FETCH_HOURS)
         ohlcv_data = OHLCVDataFrame.from_kraken_response(payload)
 
         logger.info("Fetched %d hourly candles for '%s'", len(ohlcv_data.df), pair)

@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     MODEL_FILENAME: str = "lightgbm_model_forex.pkl"
 
     # Feature extraction settings
+    PREDICTION_FETCH_HOURS: int = 200
     MIN_ROWS_FOR_FEATURES: int = 168
 
     # Rate limit defaults
