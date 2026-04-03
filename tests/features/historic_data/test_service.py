@@ -15,7 +15,8 @@ from app.core.exceptions import (
     DataValidationError,
     InsufficientDataError,
 )
-from app.features.historic_data.service import HistoricDataService, OHLCVDataFrame
+from app.core.ohlcv import OHLCVDataFrame
+from app.features.historic_data.service import HistoricDataService
 
 
 def test_fetch_hourly_ohlcv_success(mocker):

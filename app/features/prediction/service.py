@@ -27,7 +27,7 @@ from app.core.exceptions import (
     InsufficientDataError,
     ModelNotLoadedError,
 )
-from app.features.historic_data.service import KrakenAPIClient, OHLCVDataFrame
+from app.core.ohlcv import KrakenAPIClient, OHLCVDataFrame
 from app.features.prediction.schemas import PredictionRequest, PredictionResponse
 
 logger = logging.getLogger(__name__)
@@ -447,7 +447,9 @@ class PredictionService:
     def _fetch_historic_dataframe(self, pair: str) -> pd.DataFrame:
         """Fetch and parse Kraken OHLCV payload into a DataFrame."""
         logger.info("Fetching OHLCV data for '%s'", pair)
-        payload = self.api_client.fetch_ohlcv_data(pair, settings.PREDICTION_FETCH_HOURS)
+        payload = self.api_client.fetch_ohlcv_data(
+            pair, settings.PREDICTION_FETCH_HOURS
+        )
         ohlcv_data = OHLCVDataFrame.from_kraken_response(payload)
 
         logger.info("Fetched %d hourly candles for '%s'", len(ohlcv_data.df), pair)
