@@ -118,6 +118,53 @@ def test_fetch_hourly_ohlcv_http_error_raises_domain_message(mocker):
         service.fetch_hourly_ohlcv("XXBTZUSD")
 
 
+def test_fetch_hourly_ohlcv_with_mocked_client_returns_contract_shape():
+    """Service should format records from injected client payload deterministically."""
+    pair = "XXBTZUSD"
+    base_time = 1711000000
+    mocked_payload = {
+        "error": [],
+        "result": {
+            pair: [
+                [
+                    base_time,
+                    "50000.0",
+                    "51000.0",
+                    "49000.0",
+                    "50500.0",
+                    "50200.0",
+                    "100.5",
+                    150,
+                ],
+                [
+                    base_time + 3600,
+                    "50500.0",
+                    "51500.0",
+                    "49500.0",
+                    "51000.0",
+                    "50750.0",
+                    "120.0",
+                    170,
+                ],
+            ],
+            "last": base_time + 3600,
+        },
+    }
+
+    mocked_client = Mock()
+    mocked_client.fetch_ohlcv_data.return_value = mocked_payload
+    service = HistoricDataService(api_client=mocked_client)
+
+    response = service.fetch_hourly_ohlcv(pair)
+
+    mocked_client.fetch_ohlcv_data.assert_called_once()
+    assert response.symbol == pair
+    assert response.total_records == 2
+    assert len(response.data) == 2
+    assert response.data[0].timestamp < response.data[1].timestamp
+    assert response.data[1].close == 51000.0
+
+
 def test_ohlcv_dataframe_validate_required_columns():
     """Required-column validation should fail with domain exception."""
     df = pd.DataFrame(
