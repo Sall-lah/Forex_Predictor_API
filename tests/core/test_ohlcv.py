@@ -11,7 +11,7 @@ from app.core.exceptions import (
     DataValidationError,
     InsufficientDataError,
 )
-from app.core.ohlcv import KrakenAPIClient, OHLCVDataFrame
+from app.shared.ohlcv import KrakenAPIClient, OHLCVDataFrame
 
 
 def test_fetch_ohlcv_data_maps_transport_failures_to_data_fetch_error(mocker) -> None:
