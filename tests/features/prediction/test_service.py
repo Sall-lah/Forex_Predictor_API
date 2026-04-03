@@ -348,3 +348,61 @@ def test_predict_invalid_model_output_raises_data_validation_error(mocker):
 
     with pytest.raises(DataValidationError, match="Invalid model output"):
         service.predict(request)
+
+
+def test_predict_with_injected_mocks_orchestrates_dependencies():
+    """PredictionService should orchestrate mocked boundaries deterministically."""
+    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+
+    mock_api_client = Mock()
+    mock_api_client.fetch_ohlcv_data.return_value = {
+        "error": [],
+        "result": {
+            "XXBTZUSD": [
+                [
+                    1711000000,
+                    "50000.0",
+                    "51000.0",
+                    "49000.0",
+                    "50500.0",
+                    "50200.0",
+                    "100.5",
+                    150,
+                ],
+            ]
+            * 200,
+            "last": 1711000000,
+        },
+    }
+
+    mock_preprocessor = Mock(spec=OHLCVPreprocessor)
+    mock_preprocessor.extract_features.return_value = pd.DataFrame(
+        [
+            {"ema_9": 50000.0, "rsi_14h": 55.0, "volume": 100.0},
+            {"ema_9": 50100.0, "rsi_14h": 57.0, "volume": 120.0},
+        ]
+    )
+
+    mock_model = Mock()
+    mock_model.predict_proba.return_value = [[0.2, 0.8]]
+
+    mock_model_loader = Mock(spec=ModelLoader)
+    mock_model_loader.get_model.return_value = mock_model
+
+    service = PredictionService(
+        api_client=mock_api_client,
+        preprocessor=mock_preprocessor,
+        model_loader=mock_model_loader,
+    )
+
+    response = service.predict(request)
+
+    assert isinstance(response, PredictionResponse)
+    assert response.pair == "XXBTZUSD"
+    assert response.asset == "BTCUSD"
+    assert response.probability_up == 0.8
+
+    mock_api_client.fetch_ohlcv_data.assert_called_once()
+    mock_preprocessor.extract_features.assert_called_once()
+    mock_model_loader.get_model.assert_called_once()
+    mock_model.predict_proba.assert_called_once()
