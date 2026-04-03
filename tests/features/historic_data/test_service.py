@@ -15,7 +15,7 @@ from app.core.exceptions import (
     DataValidationError,
     InsufficientDataError,
 )
-from app.core.ohlcv import OHLCVDataFrame
+from app.shared.ohlcv import OHLCVDataFrame
 from app.features.historic_data.service import HistoricDataService
 
 

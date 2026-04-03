@@ -27,7 +27,7 @@ from app.core.exceptions import (
     InsufficientDataError,
     ModelNotLoadedError,
 )
-from app.core.ohlcv import KrakenAPIClient, OHLCVDataFrame
+from app.shared.ohlcv import KrakenAPIClient, OHLCVDataFrame
 from app.features.prediction.schemas import PredictionRequest, PredictionResponse
 
 logger = logging.getLogger(__name__)

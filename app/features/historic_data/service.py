@@ -3,7 +3,7 @@
 import logging
 
 from app.core.config import get_settings
-from app.core.ohlcv import KrakenAPIClient, OHLCVDataFrame
+from app.shared.ohlcv import KrakenAPIClient, OHLCVDataFrame
 from app.features.historic_data.schemas import HistoricDataResponse, OHLCVRecord
 
 logger = logging.getLogger(__name__)
