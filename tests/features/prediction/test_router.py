@@ -18,6 +18,32 @@ from app.core.exceptions import (
 from app.features.prediction.schemas import PredictionResponse
 
 
+def test_prediction_response_success_with_probability_up() -> None:
+    """Test PredictionResponse accepts canonical probability_up field."""
+    response = PredictionResponse(
+        pair="XXBTZUSD",
+        asset="BTCUSD",
+        probability_up=0.72,
+    )
+
+    assert response.probability_up == 0.72
+
+
+def test_prediction_response_success_serialization_contract_fields() -> None:
+    """Test PredictionResponse serializes canonical response contract keys only."""
+    payload = PredictionResponse(
+        pair="XXBTZUSD",
+        asset="BTCUSD",
+        probability_up=0.72,
+    ).model_dump()
+
+    assert payload == {
+        "pair": "XXBTZUSD",
+        "asset": "BTCUSD",
+        "probability_up": 0.72,
+    }
+
+
 def test_predict_endpoint_success(client, mocker):
     """Test successful prediction via API endpoint."""
     # Mock the service's predict method
