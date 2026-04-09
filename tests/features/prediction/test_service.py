@@ -339,14 +339,115 @@ def test_predict_invalid_model_output_raises_data_validation_error(mocker):
     mocker.patch.object(
         service.preprocessor,
         "extract_features",
-        return_value=pd.DataFrame({"ema_9": [50000.0], "asset": ["BTCUSD"]}),
+        return_value=pd.DataFrame({"ema_9": [50000.0]}),
     )
 
     mock_model = Mock()
+    mock_model.feature_name_ = ["ema_9"]
     mock_model.predict_proba.return_value = [[0.95]]  # missing class-1 probability
     mocker.patch.object(ModelLoader, "get_model", return_value=mock_model)
 
     with pytest.raises(DataValidationError, match="Invalid model output"):
+        service.predict(request)
+
+
+def test_predict_aligns_model_features_before_predict_proba(mocker):
+    """Prediction input should be reordered to the model feature contract."""
+    service = PredictionService()
+    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+
+    mocker.patch.object(
+        service.api_client,
+        "fetch_ohlcv_data",
+        return_value={
+            "error": [],
+            "result": {
+                "XXBTZUSD": [[1711000000, "1", "1", "1", "1", "1", "1", 1]] * 200,
+                "last": 1711000000,
+            },
+        },
+    )
+    mocker.patch.object(
+        service.preprocessor,
+        "extract_features",
+        return_value=pd.DataFrame(
+            [{"volume": 100.0, "ema_9": 50000.0, "rsi_14h": 55.0}]
+        ),
+    )
+
+    mock_model = Mock()
+    mock_model.feature_name_ = ["ema_9", "rsi_14h", "volume"]
+    mock_model.predict_proba.return_value = [[0.2, 0.8]]
+    mocker.patch.object(ModelLoader, "get_model", return_value=mock_model)
+
+    response = service.predict(request)
+
+    assert response.probability_up == 0.8
+    predict_input = mock_model.predict_proba.call_args[0][0]
+    assert list(predict_input.columns) == ["ema_9", "rsi_14h", "volume"]
+
+
+def test_predict_missing_model_required_feature_raises_data_validation_error(mocker):
+    """Missing model-required columns should fail before inference."""
+    service = PredictionService()
+    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+
+    mocker.patch.object(
+        service.api_client,
+        "fetch_ohlcv_data",
+        return_value={
+            "error": [],
+            "result": {
+                "XXBTZUSD": [[1711000000, "1", "1", "1", "1", "1", "1", 1]] * 200,
+                "last": 1711000000,
+            },
+        },
+    )
+    mocker.patch.object(
+        service.preprocessor,
+        "extract_features",
+        return_value=pd.DataFrame([{"ema_9": 50000.0, "volume": 100.0}]),
+    )
+
+    mock_model = Mock()
+    mock_model.feature_name_ = ["ema_9", "rsi_14h", "volume"]
+    mock_model.predict_proba.return_value = [[0.2, 0.8]]
+    mocker.patch.object(ModelLoader, "get_model", return_value=mock_model)
+
+    with pytest.raises(DataValidationError, match="Missing model-required feature"):
+        service.predict(request)
+
+
+def test_predict_with_inf_feature_raises_data_validation_error(mocker):
+    """Aligned model features containing Inf/NaN should be rejected."""
+    service = PredictionService()
+    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+
+    mocker.patch.object(
+        service.api_client,
+        "fetch_ohlcv_data",
+        return_value={
+            "error": [],
+            "result": {
+                "XXBTZUSD": [[1711000000, "1", "1", "1", "1", "1", "1", 1]] * 200,
+                "last": 1711000000,
+            },
+        },
+    )
+    mocker.patch.object(
+        service.preprocessor,
+        "extract_features",
+        return_value=pd.DataFrame(
+            [{"ema_9": 50000.0, "rsi_14h": float("inf"), "volume": 100.0}]
+        ),
+    )
+
+    mock_model = Mock()
+    mock_model.feature_name_ = ["ema_9", "rsi_14h", "volume"]
+    mock_model.predict_proba.return_value = [[0.2, 0.8]]
+    mocker.patch.object(ModelLoader, "get_model", return_value=mock_model)
+
+    with pytest.raises(DataValidationError, match="non-finite"):
         service.predict(request)
 
 
