@@ -25,7 +25,7 @@ This roadmap delivers one focused reliability milestone: prediction requests mus
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Enforce deterministic feature-contract alignment before prediction inference.
+- [x] 01-01-PLAN.md — Enforce deterministic feature-contract alignment before prediction inference.
 - [x] 01-02-PLAN.md — Unify prediction response schema/router contract with `probability_up` output.
 - [ ] 01-03-PLAN.md — Harden model artifact path resolution and load-failure reliability.
 
