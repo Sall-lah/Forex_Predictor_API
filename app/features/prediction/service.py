@@ -13,6 +13,7 @@ Architecture:
 """
 
 import logging
+import pickle
 import threading
 from typing import Any, Literal
 
@@ -94,8 +95,10 @@ class ModelLoader:
         model_path = settings.model_path
         if not model_path.exists():
             raise ModelNotLoadedError(
-                f"Model file not found at {model_path}. "
-                "Please ensure the model is trained and saved."
+                "Model artifact is unavailable. "
+                f"Resolved model path: {model_path}. "
+                "Please ensure the configured MODEL_DIR and MODEL_FILENAME point to "
+                "a readable trained model artifact."
             )
 
         try:
@@ -103,9 +106,19 @@ class ModelLoader:
             model = joblib.load(model_path)
             logger.info("LightGBM model loaded successfully")
             return model
-        except (OSError, ValueError, EOFError, ImportError, AttributeError) as error:
+        except (
+            OSError,
+            ValueError,
+            EOFError,
+            ImportError,
+            AttributeError,
+            KeyError,
+            pickle.UnpicklingError,
+        ) as error:
             raise ModelNotLoadedError(
-                f"Failed to load model from {model_path}: {error}"
+                "Unable to deserialize model artifact. "
+                f"Resolved model path: {model_path}. "
+                f"Root cause: {error}"
             ) from error
 
     def clear_cache(self) -> None:
