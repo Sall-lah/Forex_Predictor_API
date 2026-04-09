@@ -72,6 +72,7 @@ def test_predict_endpoint_success(client, mocker):
     # Assert
     assert response.status_code == 200
     data = response.json()
+    assert set(data.keys()) == {"pair", "asset", "probability_up"}
     assert data["pair"] == "XXBTZUSD"
     assert data["asset"] == "BTCUSD"
     assert data["probability_up"] == 0.72
@@ -104,6 +105,7 @@ def test_predict_endpoint_ethusd(client, mocker):
     # Assert
     assert response.status_code == 200
     data = response.json()
+    assert set(data.keys()) == {"pair", "asset", "probability_up"}
     assert data["asset"] == "ETHUSD"
     assert data["probability_up"] == 0.58
 
