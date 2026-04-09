@@ -9,6 +9,7 @@ Tests:
 - Feature extraction errors
 """
 
+from pathlib import Path
 from unittest.mock import Mock, MagicMock
 import pandas as pd
 import pytest
@@ -24,6 +25,7 @@ from app.features.prediction.service import (
     PredictionService,
     OHLCVPreprocessor,
     ModelLoader,
+    settings,
 )
 
 
@@ -507,3 +509,64 @@ def test_predict_with_injected_mocks_orchestrates_dependencies():
     mock_preprocessor.extract_features.assert_called_once()
     mock_model_loader.get_model.assert_called_once()
     mock_model.predict_proba.assert_called_once()
+
+
+def test_model_loader_missing_file_includes_resolved_path_in_error(monkeypatch):
+    """Missing model artifacts should report the resolved path clearly."""
+    model_dir = Path("tests/tmp/nonexistent-model-dir")
+    model_filename = "missing-model.pkl"
+    expected_path = (model_dir / model_filename).resolve()
+
+    monkeypatch.setattr(settings, "MODEL_DIR", str(model_dir))
+    monkeypatch.setattr(settings, "MODEL_FILENAME", model_filename)
+
+    with pytest.raises(ModelNotLoadedError) as exc_info:
+        ModelLoader._load_model()
+
+    message = str(exc_info.value)
+    assert "Resolved model path" in message
+    assert str(expected_path) in message
+
+
+def test_model_loader_deserialization_failure_includes_actionable_context(
+    monkeypatch, tmp_path
+):
+    """Unreadable artifacts should surface root cause and resolved path."""
+    artifact_path = tmp_path / "invalid-model.pkl"
+    artifact_path.write_text("not-a-joblib-model", encoding="utf-8")
+
+    monkeypatch.setattr(settings, "MODEL_DIR", str(tmp_path))
+    monkeypatch.setattr(settings, "MODEL_FILENAME", artifact_path.name)
+
+    with pytest.raises(ModelNotLoadedError) as exc_info:
+        ModelLoader._load_model()
+
+    message = str(exc_info.value)
+    assert "Resolved model path" in message
+    assert str(artifact_path.resolve()) in message
+    assert "Unable to deserialize model artifact" in message
+
+
+def test_model_loader_get_model_returns_loaded_model(monkeypatch, tmp_path):
+    """ModelLoader.get_model should load from configured path and cache it."""
+    artifact_path = tmp_path / "valid-model.pkl"
+    expected_model = {"name": "dummy-model"}
+    artifact_path.write_bytes(b"test")
+
+    monkeypatch.setattr(settings, "MODEL_DIR", str(tmp_path))
+    monkeypatch.setattr(settings, "MODEL_FILENAME", artifact_path.name)
+
+    mocked_joblib_load = MagicMock(return_value=expected_model)
+    monkeypatch.setattr(
+        "app.features.prediction.service.joblib.load", mocked_joblib_load
+    )
+
+    loader = ModelLoader()
+    loader.clear_cache()
+
+    loaded_model = loader.get_model()
+    loaded_model_cached = loader.get_model()
+
+    assert loaded_model == expected_model
+    assert loaded_model_cached == expected_model
+    mocked_joblib_load.assert_called_once_with(artifact_path.resolve())
