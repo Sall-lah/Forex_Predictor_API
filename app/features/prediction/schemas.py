@@ -33,9 +33,9 @@ class PredictionRequest(BaseModel):
 
 class PredictionResponse(BaseModel):
     """
-    Response containing prediction probability.
+    Response containing upward movement prediction probability.
 
-    Returns the probability that the price will move up (class 1).
+    Returns the probability that the requested asset price will move up.
     """
 
     pair: str = Field(
@@ -48,7 +48,7 @@ class PredictionResponse(BaseModel):
     )
     probability_up: float = Field(
         ...,
-        description="Probability of upward price movement (0.0 to 1.0)",
+        description="Probability of upward price movement in range [0.0, 1.0]",
         ge=0.0,
         le=1.0,
     )
