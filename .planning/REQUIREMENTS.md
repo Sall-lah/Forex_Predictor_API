@@ -10,7 +10,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Prediction Core
 
 - [x] **PRED-01**: Prediction service generates features using a deterministic extraction path aligned with `app/features/prediction/ml_models/OHLCV_PREPROCESS.md`.
-- [ ] **PRED-02**: Prediction service resolves and validates model file path handling so inference loads the intended model artifact reliably.
+- [x] **PRED-02**: Prediction service resolves and validates model file path handling so inference loads the intended model artifact reliably.
 
 ## v2 Requirements
 
@@ -36,7 +36,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | PRED-01 | Phase 1 (Prediction Contract Alignment) | Complete |
-| PRED-02 | Phase 1 (Prediction Contract Alignment) | Pending |
+| PRED-02 | Phase 1 (Prediction Contract Alignment) | Complete |
 
 **Coverage:**
 - v1 requirements: 2 total
