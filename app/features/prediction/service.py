@@ -483,8 +483,73 @@ class PredictionService:
         if not hasattr(model, "predict_proba"):
             raise ModelNotLoadedError("Loaded model does not expose predict_proba")
 
+        required_features = self._resolve_model_feature_names(model)
+        aligned_features = self._align_and_validate_features(
+            latest_features=latest_features,
+            required_features=required_features,
+        )
+
         logger.info("Making prediction for '%s'", pair)
-        return model.predict_proba(latest_features)
+        return model.predict_proba(aligned_features)
+
+    @staticmethod
+    def _resolve_model_feature_names(model: Any) -> list[str]:
+        """Resolve model feature names from LightGBM metadata."""
+        feature_names: Any | None = getattr(model, "feature_name_", None)
+
+        if not isinstance(feature_names, (list, tuple, pd.Index, np.ndarray)):
+            feature_names = None
+
+        if feature_names is None:
+            feature_name_method = getattr(model, "feature_name", None)
+            if callable(feature_name_method):
+                method_result = feature_name_method()
+                if isinstance(method_result, (list, tuple, pd.Index, np.ndarray)):
+                    feature_names = method_result
+
+        if feature_names is None:
+            raise DataValidationError(
+                "Model metadata missing feature names required for alignment"
+            )
+
+        resolved_feature_names = [str(name) for name in feature_names if str(name)]
+        if not resolved_feature_names:
+            raise DataValidationError(
+                "Model metadata returned empty feature names for alignment"
+            )
+
+        return resolved_feature_names
+
+    @staticmethod
+    def _align_and_validate_features(
+        latest_features: pd.DataFrame, required_features: list[str]
+    ) -> pd.DataFrame:
+        """Align latest features to model contract and validate numeric integrity."""
+        missing_columns = [
+            column
+            for column in required_features
+            if column not in latest_features.columns
+        ]
+        if missing_columns:
+            raise DataValidationError(
+                "Missing model-required feature columns: " + ", ".join(missing_columns)
+            )
+
+        aligned_features = latest_features.reindex(columns=required_features)
+
+        try:
+            feature_values = aligned_features.to_numpy(dtype=np.float64, copy=False)
+        except (TypeError, ValueError) as error:
+            raise DataValidationError(
+                "Aligned model features must be numeric for inference"
+            ) from error
+
+        if not np.isfinite(feature_values).all():
+            raise DataValidationError(
+                "Aligned model features contain non-finite values (NaN/Inf)"
+            )
+
+        return aligned_features
 
     @staticmethod
     def _extract_probability_up(probabilities: Any) -> float:
