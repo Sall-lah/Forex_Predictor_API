@@ -1,0 +1,199 @@
+"""
+Tests for the HistoricDataService class.
+
+Why mock httpx: Network calls in unit tests lead to flaky, slow test suites.
+We inject a mocked Kraken JSON response using pytest-mock so the focus remains
+entirely on validating data fetching and parsing operations.
+"""
+
+import pytest
+import httpx
+import pandas as pd
+from unittest.mock import Mock
+from app.core.exceptions import (
+    DataFetchError,
+    DataValidationError,
+    InsufficientDataError,
+)
+from app.shared.ohlcv import OHLCVDataFrame
+from app.features.historic_data.service import HistoricDataService
+
+
+def test_fetch_hourly_ohlcv_success(mocker):
+    """
+    Simulates a successful Kraken API response. Validate that the service
+    correctly parses the nested JSON, creates a DataFrame, and returns
+    OHLCV data without reaching out to the live network.
+    """
+    service = HistoricDataService()
+    pair = "XXBTZUSD"
+    base_time = 1711000000
+    dummy_data = []
+
+    # Generate sample OHLCV data
+    for i in range(168):  # 1 week of hourly data
+        o = 60000.0 + (i % 10) * 10
+        h = o + 500.0
+        l = o - 500.0
+        c = o + 100.0
+        dummy_data.append(
+            [
+                base_time + i * 3600,  # timestamp
+                str(o),
+                str(h),
+                str(l),
+                str(c),  # open, high, low, close
+                "60000.0",
+                "1.5",
+                10,  # vwap, volume, count
+            ]
+        )
+
+    mock_payload = {
+        "error": [],
+        "result": {pair: dummy_data, "last": base_time + 167 * 3600},
+    }
+
+    mock_response = Mock()
+    mock_response.json.return_value = mock_payload
+    mock_response.raise_for_status.return_value = None
+
+    # Override httpx.get globally during this test
+    mocker.patch("httpx.get", return_value=mock_response)
+
+    response = service.fetch_hourly_ohlcv(pair)
+
+    # Assert basic response structure
+    assert response.symbol == pair
+    assert response.total_records == 168
+    assert len(response.data) == 168
+
+    # Verify OHLCV data structure on first and last records
+    first_record = response.data[0]
+    assert first_record.timestamp is not None
+    assert first_record.open > 0
+    assert first_record.high > 0
+    assert first_record.low > 0
+    assert first_record.close > 0
+    assert first_record.volume >= 0
+
+    last_record = response.data[-1]
+    assert last_record.timestamp is not None
+    assert last_record.open > 0
+    assert last_record.high > 0
+    assert last_record.low > 0
+    assert last_record.close > 0
+    assert last_record.volume >= 0
+
+
+def test_fetch_hourly_ohlcv_api_error(mocker):
+    """
+    Simulates Kraken responding with an error inside the JSON payload.
+    Ensure our system intercepts this and raises our domain `DataFetchError`.
+    """
+    service = HistoricDataService()
+    pair = "INVALID"
+
+    mock_payload = {"error": ["EQuery:Unknown asset pair"]}
+
+    mock_response = Mock()
+    mock_response.json.return_value = mock_payload
+    mock_response.raise_for_status.return_value = None
+
+    mocker.patch("httpx.get", return_value=mock_response)
+
+    with pytest.raises(DataFetchError, match="Kraken API error"):
+        service.fetch_hourly_ohlcv(pair)
+
+
+def test_fetch_hourly_ohlcv_http_error_raises_domain_message(mocker):
+    """Ensure transport failures are mapped to a clear DataFetchError contract."""
+    service = HistoricDataService()
+
+    mocker.patch("httpx.get", side_effect=httpx.ConnectTimeout("timeout"))
+
+    with pytest.raises(
+        DataFetchError, match="Network error while fetching Kraken data"
+    ):
+        service.fetch_hourly_ohlcv("XXBTZUSD")
+
+
+def test_fetch_hourly_ohlcv_with_mocked_client_returns_contract_shape():
+    """Service should format records from injected client payload deterministically."""
+    pair = "XXBTZUSD"
+    base_time = 1711000000
+    mocked_payload = {
+        "error": [],
+        "result": {
+            pair: [
+                [
+                    base_time,
+                    "50000.0",
+                    "51000.0",
+                    "49000.0",
+                    "50500.0",
+                    "50200.0",
+                    "100.5",
+                    150,
+                ],
+                [
+                    base_time + 3600,
+                    "50500.0",
+                    "51500.0",
+                    "49500.0",
+                    "51000.0",
+                    "50750.0",
+                    "120.0",
+                    170,
+                ],
+            ],
+            "last": base_time + 3600,
+        },
+    }
+
+    mocked_client = Mock()
+    mocked_client.fetch_ohlcv_data.return_value = mocked_payload
+    service = HistoricDataService(api_client=mocked_client)
+
+    response = service.fetch_hourly_ohlcv(pair)
+
+    mocked_client.fetch_ohlcv_data.assert_called_once()
+    assert response.symbol == pair
+    assert response.total_records == 2
+    assert len(response.data) == 2
+    assert response.data[0].timestamp < response.data[1].timestamp
+    assert response.data[1].close == 51000.0
+
+
+def test_ohlcv_dataframe_validate_required_columns():
+    """Required-column validation should fail with domain exception."""
+    df = pd.DataFrame(
+        {
+            "timestamp": [pd.Timestamp("2024-01-01", tz="UTC")],
+            "open": [1.0],
+            "high": [2.0],
+            "low": [0.5],
+            "close": [1.5],
+            # volume intentionally omitted
+        }
+    )
+
+    with pytest.raises(DataValidationError, match="Missing required columns"):
+        OHLCVDataFrame(df).validate_columns()
+
+
+def test_ohlcv_dataframe_validate_minimum_rows():
+    """Row-count validation should enforce minimum size constraints."""
+    df = pd.DataFrame(
+        {
+            "timestamp": [pd.Timestamp("2024-01-01", tz="UTC")],
+            "open": [1.0],
+            "high": [2.0],
+            "low": [0.5],
+            "close": [1.5],
+            "volume": [10.0],
+        }
+    )
+
+    with pytest.raises(InsufficientDataError, match="2 required"):
+        OHLCVDataFrame(df).validate(min_rows=2)
