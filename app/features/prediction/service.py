@@ -9,7 +9,7 @@ Architecture:
   2. Preprocess and extract features
   3. Load ML model
   4. Make prediction
-  5. Return probability of upward movement
+  5. Return probabilities for movement classes
 """
 
 import logging
@@ -236,16 +236,16 @@ class OHLCVPreprocessor:
         df["ema_50"] = trend.EMAIndicator(close=close, window=50).ema_indicator()
 
         # Average Directional Index
-        df["adx"] = trend.ADXIndicator(high=high, low=low, close=close, window=14).adx()
+        df["adx"] = trend.ADXIndicator(high=high, low=low, close=close).adx()
 
         # Aroon Oscillator
         df["aroon_osc"] = trend.AroonIndicator(high, low).aroon_indicator()
 
         # Commodity Channel Index
-        df["cci"] = trend.CCIIndicator(high=high, low=low, close=close, window=20).cci()
+        df["cci"] = trend.CCIIndicator(high=high, low=low, close=close).cci()
 
         # Vortex Indicator
-        vortex = trend.VortexIndicator(high=high, low=low, close=close, window=14)
+        vortex = trend.VortexIndicator(high=high, low=low, close=close)
         df["vortex_indicator_pos"] = vortex.vortex_indicator_pos()
         df["vortex_indicator_neg"] = vortex.vortex_indicator_neg()
 
@@ -255,9 +255,7 @@ class OHLCVPreprocessor:
         df["macd_signal"] = macd.macd_signal()
 
         # KAMA
-        df["kama_indicator"] = momentum.KAMAIndicator(
-            close=close, window=10, pow1=2, pow2=30
-        ).kama()
+        df["kama_indicator"] = momentum.KAMAIndicator(close=close).kama()
 
         # Awesome Oscillator
         df["awesome_oscillator"] = momentum.AwesomeOscillatorIndicator(
@@ -273,11 +271,16 @@ class OHLCVPreprocessor:
         low = df["low"]
 
         # RSI with different periods
+        df["rsi_42h"] = momentum.RSIIndicator(close=close, window=42).rsi()
+        df["rsi_35h"] = momentum.RSIIndicator(close=close, window=35).rsi()
+        df["rsi_28h"] = momentum.RSIIndicator(close=close, window=28).rsi()
         df["rsi_21h"] = momentum.RSIIndicator(close=close, window=21).rsi()
         df["rsi_14h"] = momentum.RSIIndicator(close=close, window=14).rsi()
         df["rsi_7h"] = momentum.RSIIndicator(close=close, window=7).rsi()
 
         # Rate of Change with different periods
+        df["roc_3d"] = momentum.ROCIndicator(close=close, window=72).roc()
+        df["roc_2d"] = momentum.ROCIndicator(close=close, window=48).roc()
         df["roc_24h"] = momentum.ROCIndicator(close=close, window=24).roc()
         df["roc_12h"] = momentum.ROCIndicator(close=close, window=12).roc()
         df["roc_4h"] = momentum.ROCIndicator(close=close, window=4).roc()
@@ -285,9 +288,7 @@ class OHLCVPreprocessor:
         df["roc_1h"] = momentum.ROCIndicator(close=close, window=1).roc()
 
         # Williams %R
-        df["william_r"] = momentum.WilliamsRIndicator(
-            high=high, low=low, close=close, lbp=14
-        ).williams_r()
+        df["william_r"] = momentum.WilliamsRIndicator(high=high, low=low, close=close).williams_r()
 
         # Ultimate Oscillator
         df["ultimate_oscillator"] = momentum.UltimateOscillator(
@@ -295,9 +296,7 @@ class OHLCVPreprocessor:
         ).ultimate_oscillator()
 
         # Stochastic Oscillator
-        stoch = momentum.StochasticOscillator(
-            high=high, low=low, close=close, window=14, smooth_window=3
-        )
+        stoch = momentum.StochasticOscillator(high=high, low=low, close=close)
         df["stoch"] = stoch.stoch()
         df["stoch_signal"] = stoch.stoch_signal()
 
@@ -307,9 +306,7 @@ class OHLCVPreprocessor:
         df["ppo_signal"] = ppo.ppo_signal()
 
         # Stochastic RSI
-        df["stoch_rsi"] = momentum.StochRSIIndicator(
-            close=close, window=14, smooth1=3, smooth2=3
-        ).stochrsi()
+        df["stoch_rsi"] = momentum.StochRSIIndicator(close=close).stochrsi()
 
         return df
 
@@ -320,24 +317,20 @@ class OHLCVPreprocessor:
         low = df["low"]
 
         # Average True Range
-        df["atr"] = volatility.AverageTrueRange(
-            high=high, low=low, close=close, window=14
-        ).average_true_range()
+        df["atr"] = volatility.AverageTrueRange(high=high, low=low, close=close).average_true_range()
 
         # Bollinger Bands
-        bollinger = volatility.BollingerBands(close=close, window=20, window_dev=2)
-        df["bollinger_wband"] = bollinger.bollinger_wband()
+        bollinger = volatility.BollingerBands(close=close)
+        df["boillinger_wband"] = bollinger.bollinger_wband()
         df["bollinger_pband"] = bollinger.bollinger_pband()
 
         # Donchian Channel
-        donchian = volatility.DonchianChannel(
-            high=high, low=low, close=close, window=20
-        )
+        donchian = volatility.DonchianChannel(high=high, low=low, close=close)
         df["donchian_channel_wband"] = donchian.donchian_channel_wband()
         df["donchian_channel_pband"] = donchian.donchian_channel_pband()
 
         # Keltner Channel
-        keltner = volatility.KeltnerChannel(high=high, low=low, close=close, window=20)
+        keltner = volatility.KeltnerChannel(high=high, low=low, close=close)
         df["keltner_channel_hband"] = keltner.keltner_channel_hband()
 
         return df
@@ -349,41 +342,43 @@ class OHLCVPreprocessor:
         low = df["low"]
 
         # Weekly return (168 hours = 1 week)
-        df["custom_weekly_return"] = close.pct_change(periods=168) * 100
+        df["custom_weekly_return"] = close.pct_change(periods=168)
+
+        # Multi-window returns
+        df["custom_3d_return"] = close.pct_change(periods=72)
+        df["custom_2d_return"] = close.pct_change(periods=48)
+        df["custom_24h_return"] = close.pct_change(periods=24)
 
         # High-Low range percentage
-        df["custom_hl_range_pct"] = ((high - low) / close) * 100
+        df["custom_hl_range_pct"] = (high - low) / close
 
         # Trend consistency (close > EMA50 over last 24 periods)
-        ema_50 = trend.EMAIndicator(close=close, window=50).ema_indicator()
-        df["custom_trend_consistency"] = (close > ema_50).rolling(
-            window=24
-        ).mean() * 100
+        df['custom_trend_consistency'] = (close > close.rolling(50).mean()).astype(int).rolling(24).sum() / 24
 
         # Volatility calculations (rolling std of pct_change)
-        pct_change = close.pct_change()
-        df["custom_24h_volatility"] = pct_change.rolling(window=24).std() * 100
-        df["custom_12h_volatility"] = pct_change.rolling(window=12).std() * 100
-        df["custom_4h_volatility"] = pct_change.rolling(window=4).std() * 100
-        df["custom_2h_volatility"] = pct_change.rolling(window=2).std() * 100
+        df['custom_3d_volatility'] = close.pct_change().rolling(window=72).std()
+        df['custom_2d_volatility'] = close.pct_change().rolling(window=48).std()
+        df['custom_24h_volatility'] = close.pct_change().rolling(window=24).std()
+        df['custom_12h_volatility'] = close.pct_change().rolling(window=12).std()
+        df['custom_4h_volatility'] = close.pct_change().rolling(window=4).std()
+        df['custom_2h_volatility'] = close.pct_change().rolling(window=2).std()
 
         # Close position within rolling high-low range
-        for window in [24, 12, 4, 2]:
-            rolling_high = high.rolling(window=window).max()
-            rolling_low = low.rolling(window=window).min()
-            range_val = rolling_high - rolling_low
-            # Avoid division by zero
-            df[f"custom_close_pos_{window}h"] = np.where(
-                range_val > 0, (close - rolling_low) / range_val, 0.5
-            )
+        df['custom_close_pos_3d'] = (close - low.rolling(72).min()) / (high.rolling(72).max() - low.rolling(72).min() + 1e-9)
+        df['custom_close_pos_2d'] = (close - low.rolling(48).min()) / (high.rolling(48).max() - low.rolling(48).min() + 1e-9)
+        df['custom_close_pos_24h'] = (close - low.rolling(24).min()) / (high.rolling(24).max() - low.rolling(24).min() + 1e-9)
+        df['custom_close_pos_12h'] = (close - low.rolling(12).min()) / (high.rolling(12).max() - low.rolling(12).min() + 1e-9)
+        df['custom_close_pos_4h'] = (close - low.rolling(6).min()) / (high.rolling(6).max() - low.rolling(6).min() + 1e-9)
+        df['custom_close_pos_2h'] = (close - low.rolling(4).min()) / (high.rolling(4).max() - low.rolling(4).min() + 1e-9)
 
         # Volatility-adjusted returns
-        for window in [24, 12, 4, 2]:
-            ret = close.pct_change(periods=window) * 100
-            vol = pct_change.rolling(window=window).std() * 100
-            # Avoid division by zero
-            df[f"custom_{window}h_vol_adj_return"] = np.where(vol > 0, ret / vol, 0)
-
+        df['custom_3d_vol_adj_return'] = close.pct_change() / (df['custom_3d_volatility'] + 1e-9)
+        df['custom_2d_vol_adj_return'] = close.pct_change() / (df['custom_2d_volatility'] + 1e-9)
+        df['custom_24h_vol_adj_return'] = close.pct_change() / (df['custom_24h_volatility'] + 1e-9)
+        df['custom_12h_vol_adj_return'] = close.pct_change() / (df['custom_12h_volatility'] + 1e-9)
+        df['custom_4h_vol_adj_return'] = close.pct_change() / (df['custom_4h_volatility'] + 1e-9)
+        df['custom_2h_vol_adj_return'] = close.pct_change() / (df['custom_2h_volatility'] + 1e-9)
+        
         return df
 
 
@@ -395,14 +390,14 @@ class PredictionService:
     - Fetch historical OHLCV data via Kraken API
     - Preprocess data and extract features
     - Load and use ML model for prediction
-    - Return prediction probability
+    - Return prediction probabilities
 
     Workflow:
     1. Fetch 1 week of hourly OHLCV data from Kraken
-    2. Extract 49 technical indicators and custom features
+    2. Extract technical indicators and custom features
     3. Take the latest preprocessed row
     4. Use LightGBM model to predict price movement
-    5. Return probability of upward movement (class 1)
+    5. Return probabilities for movement classes
     """
 
     def __init__(
@@ -431,7 +426,7 @@ class PredictionService:
             request: PredictionRequest with pair and asset info
 
         Returns:
-            PredictionResponse with probability of upward movement
+            PredictionResponse with movement class probabilities
 
         Raises:
             DataFetchError: If fetching data from Kraken fails
@@ -443,18 +438,22 @@ class PredictionService:
         feature_df = self._extract_features(historic_df, request)
         latest_features = self._select_latest_feature_row(feature_df)
         probabilities = self._predict_probabilities(request.pair, latest_features)
-        prob_up = self._extract_probability_up(probabilities)
+        prob_straight, prob_up, prob_down = self._extract_probabilities(probabilities)
 
         logger.info(
-            "Prediction completed for '%s': probability_up=%.4f",
+            "Prediction completed for '%s': straight=%.4f up=%.4f down=%.4f",
             request.pair,
+            prob_straight,
             prob_up,
+            prob_down,
         )
 
         return PredictionResponse(
             pair=request.pair,
             asset=request.asset,
             probability_up=prob_up,
+            probability_down=prob_down,
+            probability_straight=prob_straight,
         )
 
     def _fetch_historic_dataframe(self, pair: str) -> pd.DataFrame:
@@ -565,25 +564,39 @@ class PredictionService:
         return aligned_features
 
     @staticmethod
-    def _extract_probability_up(probabilities: Any) -> float:
-        """Extract class-1 probability from model output with validation."""
+    def _extract_probabilities(probabilities: Any) -> tuple[float, float, float]:
+        """
+        Extract class probabilities from model output with validation.
+
+        Class order follows the model usage guide:
+        0 = Hold (straight), 1 = Buy (up), 2 = Sell (down).
+        """
         try:
+            class_zero_probability = probabilities[0][0]
             class_one_probability = probabilities[0][1]
+            class_two_probability = probabilities[0][2]
         except (TypeError, IndexError, KeyError) as error:
             raise DataValidationError(
-                "Invalid model output: expected predict_proba[[class_0, class_1]]"
+                "Invalid model output: expected predict_proba[[class_0, class_1, class_2]]"
             ) from error
 
         try:
+            probability_straight = float(class_zero_probability)
             probability_up = float(class_one_probability)
+            probability_down = float(class_two_probability)
         except (TypeError, ValueError) as error:
             raise DataValidationError(
-                "Invalid model output: class-1 probability must be numeric"
+                "Invalid model output: class probabilities must be numeric"
             ) from error
 
-        if probability_up < 0.0 or probability_up > 1.0:
-            raise DataValidationError(
-                "Invalid model output: class-1 probability out of range [0, 1]"
-            )
+        for label, value in (
+            ("class-0", probability_straight),
+            ("class-1", probability_up),
+            ("class-2", probability_down),
+        ):
+            if value < 0.0 or value > 1.0:
+                raise DataValidationError(
+                    f"Invalid model output: {label} probability out of range [0, 1]"
+                )
 
-        return probability_up
+        return probability_straight, probability_up, probability_down

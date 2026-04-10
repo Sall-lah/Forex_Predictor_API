@@ -67,8 +67,9 @@ def test_predict_success(mocker):
             "ema_9": [50000.0],
             "ema_21": [49800.0],
             "rsi_14h": [55.0],
+            "rsi_28h": [50.0],
             "volume": [100.0],
-            # Add minimal feature set (in reality would have 49 features)
+            # Add minimal feature set (in reality would have more features)
         }
     )
 
@@ -78,7 +79,7 @@ def test_predict_success(mocker):
     # Mock model loader and prediction
     mock_model = Mock()
     mock_model.feature_name_ = ["ema_9", "ema_21", "rsi_14h", "volume"]
-    mock_model.predict_proba.return_value = [[0.35, 0.65]]  # 65% probability up
+    mock_model.predict_proba.return_value = [[0.10, 0.65, 0.25]]
 
     # Mock the singleton's get_model method
     mocker.patch.object(ModelLoader, "get_model", return_value=mock_model)
@@ -91,6 +92,8 @@ def test_predict_success(mocker):
     assert response.pair == "XXBTZUSD"
     assert response.asset == "BTCUSD"
     assert response.probability_up == 0.65
+    assert response.probability_down == 0.25
+    assert response.probability_straight == 0.10
 
     # Verify method calls
     mock_api_client.assert_called_once()
@@ -285,6 +288,7 @@ def test_predict_different_asset(mocker):
         {
             "ema_9": [3000.0],
             "rsi_14h": [50.0],
+            "rsi_28h": [52.0],
         }
     )
 
@@ -293,7 +297,7 @@ def test_predict_different_asset(mocker):
 
     mock_model = Mock()
     mock_model.feature_name_ = ["ema_9", "rsi_14h"]
-    mock_model.predict_proba.return_value = [[0.55, 0.45]]  # 45% probability up
+    mock_model.predict_proba.return_value = [[0.25, 0.45, 0.30]]
 
     mocker.patch.object(ModelLoader, "get_model", return_value=mock_model)
 
@@ -304,6 +308,8 @@ def test_predict_different_asset(mocker):
     assert response.pair == "XETHZUSD"
     assert response.asset == "ETHUSD"
     assert response.probability_up == 0.45
+    assert response.probability_down == 0.30
+    assert response.probability_straight == 0.25
 
     # Verify preprocessor was called with correct asset
     mock_preprocessor.assert_called_once()
@@ -342,12 +348,12 @@ def test_predict_invalid_model_output_raises_data_validation_error(mocker):
     mocker.patch.object(
         service.preprocessor,
         "extract_features",
-        return_value=pd.DataFrame({"ema_9": [50000.0]}),
+        return_value=pd.DataFrame({"ema_9": [50000.0], "rsi_28h": [50.0]}),
     )
 
     mock_model = Mock()
     mock_model.feature_name_ = ["ema_9"]
-    mock_model.predict_proba.return_value = [[0.95]]  # missing class-1 probability
+    mock_model.predict_proba.return_value = [[0.95]]
     mocker.patch.object(ModelLoader, "get_model", return_value=mock_model)
 
     with pytest.raises(DataValidationError, match="Invalid model output"):
@@ -380,12 +386,14 @@ def test_predict_aligns_model_features_before_predict_proba(mocker):
 
     mock_model = Mock()
     mock_model.feature_name_ = ["ema_9", "rsi_14h", "volume"]
-    mock_model.predict_proba.return_value = [[0.2, 0.8]]
+    mock_model.predict_proba.return_value = [[0.05, 0.8, 0.15]]
     mocker.patch.object(ModelLoader, "get_model", return_value=mock_model)
 
     response = service.predict(request)
 
     assert response.probability_up == 0.8
+    assert response.probability_down == 0.15
+    assert response.probability_straight == 0.05
     predict_input = mock_model.predict_proba.call_args[0][0]
     assert list(predict_input.columns) == ["ema_9", "rsi_14h", "volume"]
 
@@ -414,7 +422,7 @@ def test_predict_missing_model_required_feature_raises_data_validation_error(moc
 
     mock_model = Mock()
     mock_model.feature_name_ = ["ema_9", "rsi_14h", "volume"]
-    mock_model.predict_proba.return_value = [[0.2, 0.8]]
+    mock_model.predict_proba.return_value = [[0.2, 0.8, 0.0]]
     mocker.patch.object(ModelLoader, "get_model", return_value=mock_model)
 
     with pytest.raises(DataValidationError, match="Missing model-required feature"):
@@ -447,7 +455,7 @@ def test_predict_with_inf_feature_raises_data_validation_error(mocker):
 
     mock_model = Mock()
     mock_model.feature_name_ = ["ema_9", "rsi_14h", "volume"]
-    mock_model.predict_proba.return_value = [[0.2, 0.8]]
+    mock_model.predict_proba.return_value = [[0.2, 0.8, 0.0]]
     mocker.patch.object(ModelLoader, "get_model", return_value=mock_model)
 
     with pytest.raises(DataValidationError, match="non-finite"):
@@ -489,7 +497,7 @@ def test_predict_with_injected_mocks_orchestrates_dependencies():
 
     mock_model = Mock()
     mock_model.feature_name_ = ["ema_9", "rsi_14h", "volume"]
-    mock_model.predict_proba.return_value = [[0.2, 0.8]]
+    mock_model.predict_proba.return_value = [[0.2, 0.8, 0.0]]
 
     mock_model_loader = Mock(spec=ModelLoader)
     mock_model_loader.get_model.return_value = mock_model
@@ -506,6 +514,8 @@ def test_predict_with_injected_mocks_orchestrates_dependencies():
     assert response.pair == "XXBTZUSD"
     assert response.asset == "BTCUSD"
     assert response.probability_up == 0.8
+    assert response.probability_down == 0.0
+    assert response.probability_straight == 0.2
 
     mock_api_client.fetch_ohlcv_data.assert_called_once()
     mock_preprocessor.extract_features.assert_called_once()
@@ -593,7 +603,7 @@ def test_predict_missing_model_file_reports_resolved_path(mocker, monkeypatch):
     mocker.patch.object(
         service.preprocessor,
         "extract_features",
-        return_value=pd.DataFrame([{"ema_9": 50000.0}]),
+        return_value=pd.DataFrame([{"ema_9": 50000.0, "rsi_28h": 50.0}]),
     )
 
     model_dir = Path("tests/tmp/missing-model")
@@ -633,7 +643,7 @@ def test_predict_invalid_model_without_predict_proba_raises_model_not_loaded_err
     mocker.patch.object(
         service.preprocessor,
         "extract_features",
-        return_value=pd.DataFrame([{"ema_9": 50000.0}]),
+        return_value=pd.DataFrame([{"ema_9": 50000.0, "rsi_28h": 50.0}]),
     )
 
     mocker.patch.object(ModelLoader, "get_model", return_value=object())

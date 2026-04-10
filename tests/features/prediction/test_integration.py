@@ -51,9 +51,14 @@ def test_predict_btcusd_live():
     assert response.pair == "BTC/USD"
     assert response.asset == "BTCUSD"
     assert 0.0 <= response.probability_up <= 1.0
+    assert 0.0 <= response.probability_down <= 1.0
+    assert 0.0 <= response.probability_straight <= 1.0
 
     print(
-        f"\nBTC/USD Prediction: {response.probability_up:.2%} probability of upward movement"
+        "\nBTC/USD Prediction: "
+        f"straight={response.probability_straight:.2%} "
+        f"up={response.probability_up:.2%} "
+        f"down={response.probability_down:.2%}"
     )
 
 
@@ -81,9 +86,14 @@ def test_predict_ethusd_live():
     assert response.pair == "ETH/USD"
     assert response.asset == "ETHUSD"
     assert 0.0 <= response.probability_up <= 1.0
+    assert 0.0 <= response.probability_down <= 1.0
+    assert 0.0 <= response.probability_straight <= 1.0
 
     print(
-        f"\nETH/USD Prediction: {response.probability_up:.2%} probability of upward movement"
+        "\nETH/USD Prediction: "
+        f"straight={response.probability_straight:.2%} "
+        f"up={response.probability_up:.2%} "
+        f"down={response.probability_down:.2%}"
     )
 
 
@@ -115,7 +125,11 @@ def test_predict_via_api_btcusd_live(client):
     assert data["pair"] == "BTC/USD"
     assert data["asset"] == "BTCUSD"
     assert "probability_up" in data
+    assert "probability_down" in data
+    assert "probability_straight" in data
     assert 0.0 <= data["probability_up"] <= 1.0
+    assert 0.0 <= data["probability_down"] <= 1.0
+    assert 0.0 <= data["probability_straight"] <= 1.0
 
     print(f"\nAPI Response: {data}")
 
@@ -146,6 +160,8 @@ def test_predict_via_api_ethusd_live(client):
     assert data["pair"] == "ETH/USD"
     assert data["asset"] == "ETHUSD"
     assert 0.0 <= data["probability_up"] <= 1.0
+    assert 0.0 <= data["probability_down"] <= 1.0
+    assert 0.0 <= data["probability_straight"] <= 1.0
 
     print(f"\nAPI Response: {data}")
 
@@ -178,8 +194,18 @@ def test_predict_model_consistency():
     diff = abs(response1.probability_up - response2.probability_up)
     assert diff < 0.01, f"Predictions differ by {diff:.4f}"
 
-    print(f"\nPrediction 1: {response1.probability_up:.4f}")
-    print(f"Prediction 2: {response2.probability_up:.4f}")
+    print(
+        "\nPrediction 1: "
+        f"straight={response1.probability_straight:.4f} "
+        f"up={response1.probability_up:.4f} "
+        f"down={response1.probability_down:.4f}"
+    )
+    print(
+        "Prediction 2: "
+        f"straight={response2.probability_straight:.4f} "
+        f"up={response2.probability_up:.4f} "
+        f"down={response2.probability_down:.4f}"
+    )
     print(f"Difference: {diff:.6f}")
 
 
