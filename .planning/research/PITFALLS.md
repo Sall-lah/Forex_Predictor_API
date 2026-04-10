@@ -1,262 +1,197 @@
-# Pitfalls Research
+# Domain Pitfalls
 
-**Domain:** ML-based forex prediction API operations (FastAPI + Kraken OHLC + LightGBM/scikit-learn)
-**Researched:** 2026-04-11
-**Confidence:** HIGH
+**Domain:** Live backend → `api/web` monorepo migration with independent env/runtime paths  
+**Researched:** 2026-04-11  
+**Confidence:** MEDIUM-HIGH
 
 ## Critical Pitfalls
 
-### Pitfall 1: Training/Serving on Incomplete Candles
+### Pitfall 1: “Moved folders, broke imports” (Python module path drift)
+**What goes wrong:**  
+After moving backend code under `api/`, import resolution changes (`ModuleNotFoundError`, wrong package roots, flaky local vs CI behavior).
 
-**What goes wrong:**
-Teams include Kraken’s latest OHLC row as if it were final. That row is explicitly the *current, not-yet-committed* candle, so features/labels become unstable and predictions oscillate.
+**Why it happens:**  
+Teams assume repo-root execution semantics still apply. Python import path depends on execution context and script location.
 
-**Why it happens:**
-Polling code assumes “last row is newest truth” and skips exchange-specific semantics.
+**Consequences:**  
+API boots locally for one developer but fails in CI/containers; tests fail depending on current working directory.
 
-**How to avoid:**
-- In ingestion and prediction feature prep, drop the last OHLC row unless timestamp < (now - interval).
-- Use Kraken `result.last` as the next `since` cursor for committed updates.
-- Add a contract test that asserts incomplete candle exclusion.
+**Prevention strategy:**  
+- Treat `api/` as the Python project root and standardize all commands from that root.
+- Use explicit launch conventions (e.g., `uvicorn app.main:app --app-dir api` from repo root, or run from `api/` directly).
+- Add a migration gate: run startup and tests both from repo root and from `api/` to catch path assumptions.
 
 **Warning signs:**
-- Prediction flips direction rapidly within the same interval without major market move.
-- Backtests look much better than live performance.
-- Feature values near candle boundary show abrupt reversals.
+- `ModuleNotFoundError` after directory move.
+- Different behavior between `pytest` run from root vs `api/`.
+- Uvicorn starts only with ad-hoc `PYTHONPATH` tweaks.
 
-**Phase to address:**
-Phase 1 — Data Reliability Hardening (upstream contract correctness before any model changes).
+**Phase mapping:**  
+**Phase 1 (Restructure + boot safety):** finalize import strategy and run-command contract before any new feature work.
 
 ---
 
-### Pitfall 2: Assuming Kraken OHLC Supports Deep Backfill
+### Pitfall 2: Cross-app env leakage (`.env` scope confusion)
+**What goes wrong:**  
+`api` and `web` read each other’s variables, or root-level `.env` accidentally overrides app-local values.
 
-**What goes wrong:**
-Teams design recovery/backfill expecting arbitrary history from Kraken OHLC. Kraken returns up to 720 recent entries, so outages create unrecoverable gaps if no secondary storage exists.
+**Why it happens:**  
+Dotenv and tooling precedence rules are often misunderstood. Teams keep a root `.env` “temporarily” and never remove ambiguity.
 
-**Why it happens:**
-`since` parameter is treated as full historical cursor, not bounded rolling window.
+**Consequences:**  
+Wrong runtime config in staging/prod, silent credential mix-ups, hard-to-debug “works on my machine” behavior.
 
-**How to avoid:**
-- Persist raw OHLC snapshots internally (DB/object storage) as system-of-record.
-- Define explicit outage recovery policy: if gap > 720 candles, mark prediction quality degraded.
-- Add “data completeness” checks before inference.
+**Prevention strategy:**  
+- Enforce app-local env files only (`api/.env`, `web/.env`), no shared root runtime `.env`.
+- Document and test precedence explicitly (OS env > dotenv for pydantic-settings).
+- Add startup validation that logs non-secret config origin/sanity (e.g., expected mode/URL patterns).
 
 **Warning signs:**
-- Sudden holes in feature windows after downtime.
-- Rebooted service cannot reconstruct required lookback period.
-- Silent fallback to smaller windows without explicit error/degradation flag.
+- API uses unexpected host/URL without code changes.
+- Local and CI config diverge even with same `.env` content.
+- Developers export shell vars to “fix” config repeatedly.
 
-**Phase to address:**
-Phase 1 — Data Reliability Hardening.
+**Phase mapping:**  
+**Phase 1 (Restructure + config isolation):** define env boundaries and remove ambiguous root-level env behavior.
 
 ---
 
-### Pitfall 3: Upstream Rate-Limit/Outage Cascades
+### Pitfall 3: CI still executes from old root assumptions
+**What goes wrong:**  
+Pipeline scripts continue to run commands in repo root, using stale paths for tests, artifacts, or startup commands.
 
-**What goes wrong:**
-When Kraken returns throttling/errors, API instances retry aggressively or fail synchronously, causing latency spikes and cascading 5xx responses.
+**Why it happens:**  
+Migration updates code tree, but CI defaults/working-directory settings are not migrated in lockstep.
 
-**Why it happens:**
-No jittered backoff, no circuit breaker, and no stale-data fallback path.
+**Consequences:**  
+Green local runs but red CI; or worse, CI appears green while skipping the intended app checks.
 
-**How to avoid:**
-- Implement bounded retries with exponential backoff + jitter.
-- Add circuit breaker around Kraken client; fail fast while open.
-- Serve last-known-good feature snapshot with explicit `degraded=true` metadata when policy allows.
-- Define SLO-aware timeout budgets per endpoint.
+**Prevention strategy:**  
+- Explicitly set `working-directory` for app-specific jobs.
+- Split CI into `api` and `web` jobs with independent command contracts.
+- Add a temporary parity check job that verifies old paths are no longer referenced.
 
 **Warning signs:**
-- Burst of 429 / upstream timeout errors.
-- P95 latency rises sharply before outright failures.
-- Worker saturation during Kraken incidents.
+- CI errors: file not found for old paths.
+- Sudden drop in test count after migration.
+- Job passes suspiciously fast after major folder move.
 
-**Phase to address:**
-Phase 1 — Reliability and Failure-Mode Hardening.
+**Phase mapping:**  
+**Phase 2 (CI/CD migration):** update and validate workflow working directories before declaring migration complete.
 
 ---
 
-### Pitfall 4: Process-Local Rate Limiting in Multi-Worker Deployments
+### Pitfall 4: Test discovery drift after relocating tests/config
+**What goes wrong:**  
+Pytest rootdir/config selection changes, causing missing tests, different markers/options, or plugin behavior changes.
 
-**What goes wrong:**
-Scaling to multiple workers/instances bypasses true global quota enforcement because each process tracks limits independently.
+**Why it happens:**  
+Pytest rootdir is derived from invocation paths and nearby config files; moving files without invocation discipline changes behavior.
 
-**Why it happens:**
-In-memory bucket state is not shared across processes.
+**Consequences:**  
+False confidence from partial test runs, inconsistent node IDs/cache behavior, broken coverage trends.
 
-**How to avoid:**
-- Move limiter storage to Redis (or API gateway-level quota enforcement).
-- Key limits by authenticated principal (API key), not only IP.
-- Add distributed load test verifying global cap behavior.
+**Prevention strategy:**  
+- Pin test entrypoints (e.g., `pytest api/tests` or run from `api/` consistently).
+- Keep one authoritative pytest config location and document it.
+- Add CI assertion for expected collected test count threshold.
 
 **Warning signs:**
-- Effective allowed request rate increases with worker count.
-- “Abusive” clients pass by rotating connections across instances.
-- Inconsistent throttling decisions between pods.
+- `rootdir` in pytest header unexpectedly changes.
+- Marker warnings suddenly appear/disappear.
+- Coverage drops with no logical code deletion.
 
-**Phase to address:**
-Phase 2 — Security and Traffic Control.
+**Phase mapping:**  
+**Phase 2 (Quality guardrails):** lock test invocation and verify collection parity.
 
 ---
 
-### Pitfall 5: Model Artifact Compatibility Drift
+### Pitfall 5: Runtime command split without operational contract
+**What goes wrong:**  
+`api` and `web` have “independent commands” but no canonical scripts, so every engineer/integration runs a different variant.
 
-**What goes wrong:**
-Serialized model loads with warnings or breaks after dependency updates; worst case is silent prediction behavior drift.
+**Why it happens:**  
+Teams stop at folder creation and skip command standardization for local dev, CI, and deployment.
 
-**Why it happens:**
-Unpinned runtime/training dependencies and weak artifact metadata/version checks.
+**Consequences:**  
+Onboarding friction, flaky reproducibility, and deployment drift (different startup flags/watch dirs/app dirs).
 
-**How to avoid:**
-- Pin training + serving dependency matrix and store with artifact metadata.
-- Fail startup on version mismatch (don’t suppress `InconsistentVersionWarning` in production path).
-- Introduce artifact manifest: model version, sklearn/lightgbm versions, feature schema hash, training data snapshot ID.
-
-**Warning signs:**
-- Startup warnings around estimator version mismatch.
-- Prediction distribution shift after innocuous deploy.
-- “Works in dev, fails in prod” model loading behavior.
-
-**Phase to address:**
-Phase 2 — Model Lifecycle and Release Governance.
-
----
-
-### Pitfall 6: Feature Schema Drift Between Training and Inference
-
-**What goes wrong:**
-Column name/order drift (including typo fixes) breaks model input contract, causing hard failures or wrong predictions.
-
-**Why it happens:**
-Feature engineering evolves without a versioned schema contract and migration tests.
-
-**How to avoid:**
-- Treat feature schema as versioned API contract.
-- Validate exact required feature set and order before inference.
-- Add migration harness: old artifact + new pipeline compatibility test.
+**Prevention strategy:**  
+- Define one canonical command set per app (dev, test, prod run).
+- Keep command wrappers in-repo (Makefile/scripts/task runner) and use them everywhere.
+- Require docs + smoke checks for each command path.
 
 **Warning signs:**
-- Missing/extra feature exceptions after refactors.
-- Sudden drop in confidence calibration without upstream data change.
-- Frequent hotfixes around feature name mismatches.
+- Team shares one-off commands in chat repeatedly.
+- Different run commands in README vs CI vs deployment manifests.
+- “It only works when I run it from X folder.”
 
-**Phase to address:**
-Phase 2 — Model Contract Hardening.
+**Phase mapping:**  
+**Phase 1 (Developer experience contract):** establish canonical commands before structural migration is considered done.
 
----
+## Moderate Pitfalls
 
-### Pitfall 7: Time-Series Leakage in Validation
+### Pitfall 1: Hidden shared-state coupling
+**What goes wrong:**  
+Code assumes shared root files/paths (model artifacts, temp dirs, caches) that break once app boundaries are isolated.
 
-**What goes wrong:**
-Offline metrics look excellent, but live performance underperforms because evaluation leaked future information.
-
-**Why it happens:**
-Random splits or preprocessing fitted on full dataset before split.
-
-**How to avoid:**
-- Use walk-forward or `TimeSeriesSplit` validation only.
-- Fit preprocessing strictly on train folds via sklearn `Pipeline`.
-- Gate releases on forward-window performance and calibration thresholds.
+**Prevention:**  
+Inventory filesystem dependencies; convert to app-scoped paths/config with explicit defaults.
 
 **Warning signs:**
-- Large gap between backtest and live precision.
-- Retrains report dramatic improvements that vanish in production.
-- Postmortems identify train-time access to future rows.
+- Runtime errors for missing relative files after move.
+- Artifact path fixes hardcoded in multiple places.
 
-**Phase to address:**
-Phase 3 — Prediction Quality Assurance.
+**Phase mapping:**  
+**Phase 1:** dependency/path audit during move.
 
----
+### Pitfall 2: Over-scaffolding `web/` in a backend migration milestone
+**What goes wrong:**  
+Placeholder frontend scope expands into framework/tooling debates and delays API stabilization.
 
-### Pitfall 8: No Confidence/Degradation Signaling in API Responses
-
-**What goes wrong:**
-Consumers treat all predictions as equally trustworthy, even when data is stale, lookback is incomplete, or fallback path was used.
-
-**Why it happens:**
-Response schema lacks quality metadata and failure mode encoding.
-
-**How to avoid:**
-- Add response fields: `data_freshness_seconds`, `feature_window_complete`, `model_version`, `degraded_mode`.
-- Return explicit non-200 or soft-fail status based on policy when quality gates fail.
-- Document consumer handling contract.
+**Prevention:**  
+Keep `web/` minimal placeholder contract (README, run stub, env example) and defer product frontend decisions.
 
 **Warning signs:**
-- Client teams ask why predictions changed “randomly.”
-- Incidents where stale data produced valid-looking 200 responses.
-- No way to correlate bad outcomes with degraded inputs.
+- PRs introduce large frontend dependency trees unrelated to migration safety.
+- API migration tasks blocked on frontend setup decisions.
 
-**Phase to address:**
-Phase 3 — API Contract and Consumer Trust.
+**Phase mapping:**  
+**Phase 1:** strict scope guardrails.
 
----
+## Minor Pitfalls
 
-### Pitfall 9: Missing Authentication + Weak Abuse Attribution
+### Pitfall 1: Tooling docs lag behind structure
+**What goes wrong:**  
+README/runbooks/onboarding still reference root commands and paths.
 
-**What goes wrong:**
-Public prediction endpoints get scraped/abused; limits keyed only by IP are easy to evade and make tenant-level control impossible.
-
-**Why it happens:**
-Service starts as internal API and auth is deferred too long.
-
-**How to avoid:**
-- Add API key or JWT auth before broader exposure.
-- Combine auth with per-principal quotas and audit logging.
-- Preserve trusted proxy config carefully; trust only known proxy IPs.
+**Prevention:**  
+Treat docs update as definition-of-done for each migration phase.
 
 **Warning signs:**
-- Traffic spikes from rotating IPs.
-- Inability to identify high-cost clients.
-- Frequent rate-limit incidents despite “strict” settings.
+- New contributors fail first-run setup.
+- Frequent “docs are outdated” comments on PRs.
 
-**Phase to address:**
-Phase 2 — Security and Access Control.
-
----
-
-### Pitfall 10: Operating Without Prediction Drift Monitoring
-
-**What goes wrong:**
-Model quality degrades gradually (regime change, volatility shift) while API health remains green; teams discover failure only from downstream losses.
-
-**Why it happens:**
-Only infra metrics are tracked (latency/errors), not model performance and calibration over time.
-
-**How to avoid:**
-- Track delayed-label metrics per pair/interval: hit rate, Brier score, calibration bins.
-- Define alert thresholds and retraining triggers.
-- Version and compare champion/challenger models in shadow mode.
-
-**Warning signs:**
-- Stable uptime with worsening business outcomes.
-- Confidence scores remain high while realized accuracy falls.
-- No model-quality dashboards tied to production predictions.
-
-**Phase to address:**
-Phase 4 — Observability and Continuous Evaluation.
+**Phase mapping:**  
+**Phase 3 (Hardening):** documentation parity pass.
 
 ## Phase-Specific Warnings
 
 | Phase Topic | Likely Pitfall | Mitigation |
 |-------------|---------------|------------|
-| Data ingestion hardening | Incomplete-candle leakage | Enforce committed-candle-only rule + tests |
-| Resilience implementation | Retry storm amplification | Add exponential backoff, jitter, and circuit breaker |
-| Security rollout | IP-only quotas remain bypassable | Introduce principal-based auth + distributed limiter |
-| Model release process | Version drift of serialized artifacts | Startup compatibility checks + pinned dependency matrix |
-| Quality gates | Leakage in evaluation | TimeSeriesSplit + strict train-only preprocessing |
-| API contract extension | No degradation signaling | Add freshness/completeness/degraded metadata |
-| Production monitoring | Hidden model drift | Realized-performance dashboards + alerts |
+| Phase 1: Folder migration (`api/`, `web/`) | Import/path breakage and config leakage | Lock import root strategy; enforce app-local env files only; add boot smoke tests |
+| Phase 1: Independent run commands | Command sprawl/no canonical entrypoints | Publish single command contract per app and enforce in CI/docs |
+| Phase 2: CI migration | Wrong working-directory, stale paths, skipped tests | Split app jobs; set explicit working dirs; assert collected test count |
+| Phase 2: Test/config relocation | Pytest rootdir drift | Standardize invocation path and one config source |
+| Phase 3: Deployment/runtime hardening | Env precedence surprises across environments | Validate env precedence and run startup config sanity checks |
 
 ## Sources
 
-- Kraken OHLC docs (committed vs current candle, 720-entry limit): https://docs.kraken.com/api/docs/rest-api/get-ohlc-data (HIGH)
-- Kraken Spot REST rate limits: https://docs.kraken.com/api/docs/guides/spot-rest-ratelimits (HIGH)
-- FastAPI deployment behind proxy / forwarded headers trust: https://fastapi.tiangolo.com/advanced/behind-a-proxy/ (HIGH)
-- FastAPI lifespan events for startup/shutdown resource handling: https://fastapi.tiangolo.com/advanced/events/ (HIGH)
-- scikit-learn model persistence limitations and version/security warnings: https://scikit-learn.org/stable/model_persistence.html (HIGH)
-- scikit-learn common pitfalls (data leakage, pipelines): https://scikit-learn.org/stable/common_pitfalls.html (HIGH)
-- Repository-specific operational concerns audit: `.planning/codebase/CONCERNS.md` and `.planning/codebase/INTEGRATIONS.md` (HIGH)
-
----
-*Pitfalls research for: Forex prediction API (production hardening + extension)*
-*Researched: 2026-04-11*
+- Pydantic Settings docs (env file usage + precedence): https://github.com/pydantic/pydantic-settings/blob/main/docs/index.md (**HIGH**)  
+- Pytest docs (rootdir and config discovery behavior): https://github.com/pytest-dev/pytest/blob/main/doc/en/reference/customize.md (**HIGH**)  
+- Uvicorn settings docs (`--app-dir`, reload dir semantics): https://github.com/kludex/uvicorn/blob/main/docs/settings.md (**HIGH**)  
+- GitHub Actions docs (default working-directory): https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/setting-a-default-shell-and-working-directory (**HIGH**)  
+- Docker Compose docs (env files, interpolation, precedence):  
+  - https://docs.docker.com/compose/how-tos/environment-variables/set-environment-variables/  
+  - https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/ (**HIGH**)  
+- Python docs (`sys.path` initialization and execution context impact): https://docs.python.org/3/library/sys_path_init.html (**HIGH**)

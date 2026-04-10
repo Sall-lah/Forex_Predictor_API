@@ -1,8 +1,8 @@
 # Feature Research
 
-**Domain:** Forex prediction API for developers and automated trading workflows
+**Domain:** API + web monorepo restructuring (web placeholder initially)
 **Researched:** 2026-04-11
-**Confidence:** MEDIUM
+**Confidence:** HIGH
 
 ## Feature Landscape
 
@@ -12,14 +12,13 @@ Features users assume exist. Missing these = product feels incomplete.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Deterministic prediction contract (strict request/response schema + versioned endpoint) | Bot workflows break on schema drift; developers expect stable contracts | MEDIUM | Keep `prediction`, `probabilities`, `pair`, `timeframe`, `model_version`, `timestamp` explicit and typed. (Confidence: HIGH) |
-| Health, readiness, and dependency status endpoints | Automation platforms need machine-checkable service state for orchestration/restarts | LOW | Split liveness vs readiness; readiness should fail when model artifact or upstream market-data dependency is unavailable. (HIGH) |
-| Consistent error taxonomy and HTTP semantics | Workflow engines route retries/escalations based on status code and error code | MEDIUM | Separate validation errors (4xx), upstream transient errors (5xx/502/503), and model-runtime errors with stable `error_code`. (HIGH) |
-| Request timeouts, retries, and circuit-breaker behavior for market-data provider calls | External data providers are failure-prone; APIs must degrade predictably | MEDIUM | Add bounded timeout + retry policy + fallback behavior (`stale_data`, `partial_unavailable`) instead of hanging requests. (MEDIUM) |
-| Rate limiting and quota visibility | Public API consumers assume per-key/per-client rate limits and actionable feedback headers | MEDIUM | Return remaining quota/reset metadata so clients can self-throttle. (MEDIUM) |
-| Core observability (request count, latency histograms, error rate, in-progress requests) | Production API reliability requires SLOs/alerting, not just logs | MEDIUM | Expose Prometheus-style metrics (`Counter`, `Histogram`, `Gauge`) and correlate with request IDs. (HIGH) |
-| Model and data freshness metadata in every prediction | Consumers need to know if prediction used recent data and which model generated it | LOW | Include `data_timestamp`, `prediction_timestamp`, `model_version`, optional `feature_window_end`. (MEDIUM) |
-| Authentication and basic usage governance | Developer-facing APIs are expected to protect endpoints and support multi-client usage policies | MEDIUM | API key/JWT + per-client limits + audit trail; no auth is acceptable only for internal-only deployments. (LOW for mandatory auth in this specific repo, HIGH for external API norm) |
+| Independent app execution (`api` and `web`) | Core promise of monorepo split is separate run workflows | MEDIUM | Must support `api` boot without `web`, and `web` placeholder boot without `api` runtime coupling |
+| App-local environment configuration (`api/.env`, `web/.env`) | Prevents config leakage and accidental cross-app breakage | MEDIUM | Keep env schema validation app-specific; avoid root-global env file as default |
+| Backend behavior parity after move | Existing consumers expect no endpoint regressions from restructuring | HIGH | Migration is structural, not product rewrite; require existing API tests to pass in `api/` path |
+| Root-level developer commands for common workflows | Teams expect one entrypoint for install/lint/test/dev across apps | LOW | Use workspace runner scripts at root; delegate to app-specific commands |
+| Scoped task execution (run only one app or changed app) | Monorepos become slow/noisy without filtering | MEDIUM | pnpm `--filter`, Turborepo `--filter`, Nx `affected` are standard patterns |
+| CI path/affected scoping between `api` and `web` | Placeholder web should not block API delivery and vice versa | MEDIUM | At minimum, path-based CI split; ideally graph/affected execution |
+| Monorepo onboarding docs | Repo structure shift requires explicit local workflow guidance | LOW | Document commands, env locations, and "web is placeholder" constraints |
 
 ### Differentiators (Competitive Advantage)
 
@@ -27,12 +26,11 @@ Features that set the product apart. Not required, but valuable.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Online model-quality monitoring (prediction drift + outcome quality drift) | Moves API from “signal feed” to “trustworthy decision input” with early warning before silent quality decay | HIGH | Baseline + scheduled drift checks + alert hooks. Mirrors managed offerings like SageMaker Model Monitor. (MEDIUM) |
-| Champion–challenger / shadow prediction mode | Enables safe model upgrades with real traffic before full cutover | HIGH | Return primary prediction while logging shadow model outputs for offline comparison; supports progressive rollout. (HIGH) |
-| Calibration + confidence diagnostics endpoint | Helps users decide when NOT to trade and set confidence thresholds programmatically | MEDIUM | Publish rolling Brier score / calibration bins / hit-rate by confidence bucket. (MEDIUM) |
-| Backtest/replay API for strategy validation | Lets developers validate model behavior on historical windows using same inference contract | HIGH | Critical for workflow trust before live automation. Keep separate from online prediction latency path. (MEDIUM) |
-| Explainability payloads (lightweight feature contribution summary) | Increases operator trust and accelerates debugging of regime changes | HIGH | Optional field/endpoint; keep compact to avoid latency bloat. (LOW-MEDIUM, depends on model type/artifacts) |
-| Reliability SLO endpoint/reporting (uptime, p95 latency, data-lag SLA) | Enterprise integrators choose vendors with measurable reliability guarantees | MEDIUM | Expose rolling SLO attainment and incident status feed. (MEDIUM) |
+| Graph-aware affected pipelines (not just path filters) | Much faster CI on large repo growth; scales beyond two apps | MEDIUM | Nx affected or equivalent graph-based tooling gives better precision than simple folder matching |
+| Shared remote task cache (local + CI) | Major developer speed-up on repeated lint/test/build tasks | MEDIUM | Turborepo/Nx both support remote caching patterns; high payoff as repo grows |
+| Contract-first API artifact flow to web placeholder | De-risks future frontend by validating API contract from day one | MEDIUM | Generate OpenAPI artifact in `api`, make `web` consume or validate against it even as placeholder |
+| One-command full-stack dev profile | Better DX for new contributors while preserving independent runtimes | MEDIUM | Keep separate app commands plus optional composed command (e.g., run both concurrently) |
+| Scaffold/generator workflow for future apps/packages | Prevents repo drift and enforces structure conventions | HIGH | Useful once monorepo expands beyond `api`/`web`; can be deferred until after baseline migration |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
@@ -40,91 +38,79 @@ Features that seem good but create problems.
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| “One endpoint does everything” (train + backtest + infer + admin ops) | Seems convenient and fast to ship | Couples latency-critical inference to heavy/offline workloads; harder to scale and secure | Keep inference API narrow; move retraining/backtests/admin to separate async/internal endpoints |
-| Unbounded real-time streaming/WebSocket-first design from day one | Perceived as “more real-time” | Adds ops complexity (stateful infra, fan-out, backpressure) before reliability basics are mature | Start with robust pull-based HTTP + webhooks; add streaming only after proven demand |
-| Overly granular feature toggles per request (custom indicators/model params each call) | Promises flexibility for quants | Breaks reproducibility, increases abuse risk, and complicates model validation | Offer curated model profiles/tiers with explicit versioning |
-| Returning raw provider payloads directly to users | Saves transformation effort | Leaks provider schema instability upstream; breaks client contracts on provider changes | Normalize provider data into internal canonical schema before serving |
+| Build full web app in restructure milestone | "We already have `web/`, let’s start shipping UI now" | Violates migration scope, increases risk to API parity, delays core restructure value | Keep `web/` as executable placeholder with health route/skeleton only |
+| Premature shared "common" package extraction | "DRY everything immediately" | Creates unstable abstractions before real cross-app usage patterns exist | Duplicate small pieces initially; extract only after repeated, proven reuse |
+| Multiple orchestrators at once (Nx + Turborepo + custom scripts) | "Future-proof tooling" mindset | Tool overlap, config churn, unclear ownership, slower onboarding | Pick one orchestration path and keep root scripts stable |
+| Tight runtime coupling between placeholder web and API startup | "Single command should fail if either app is missing" | Prevents independent operation goal and blocks placeholder progress | Support optional composed run, but preserve standalone app boot |
 
 ## Feature Dependencies
 
 ```
-[Stable Prediction Contract]
-    └──requires──> [Error Taxonomy]
-    └──requires──> [Model/Data Freshness Metadata]
+[Independent app execution]
+    └──requires──> [App-local env configuration]
+                          └──requires──> [Monorepo onboarding docs]
 
-[Readiness Endpoint]
-    └──requires──> [Dependency Checks: model artifact + market data provider]
+[Backend behavior parity after move]
+    └──requires──> [Scoped task execution]
+                          └──requires──> [CI path/affected scoping]
 
-[Rate Limiting & Auth]
-    └──requires──> [Client Identity]
+[Contract-first API artifact flow to web placeholder]
+    └──requires──> [Independent app execution]
+    └──enhances──> [Future web implementation readiness]
 
-[Core Observability]
-    └──enables──> [SLO Reporting]
-    └──enables──> [Drift/Quality Alerting]
+[One-command full-stack dev profile] ──enhances──> [Independent app execution]
 
-[Champion-Challenger / Shadow Mode]
-    └──requires──> [Model Versioning]
-    └──requires──> [Prediction Logging + Offline Evaluation Pipeline]
-
-[Calibration Diagnostics]
-    └──requires──> [Outcome Label Ingestion]
-    └──requires──> [Historical Prediction Store]
-
-[Backtest/Replay API]
-    └──requires──> [Historical Data Access]
-    └──requires──> [Reproducible Feature Pipeline]
+[Build full web app in restructure milestone] ──conflicts──> [Backend behavior parity after move]
 ```
 
 ### Dependency Notes
 
-- **Core observability enables SLO and quality monitoring:** without latency/error/request metrics, there is no defensible “production ready” claim.
-- **Champion-challenger requires model versioning + logging:** safe rollout is impossible if predictions cannot be attributed to exact model versions.
-- **Calibration diagnostics require realized outcomes:** confidence quality can’t be validated from predictions alone.
-- **Readiness must include external dependencies:** liveness-only checks create false “healthy” signals during provider/model outages.
+- **Independent app execution requires app-local env configuration:** each app needs isolated runtime contracts to avoid accidental cross-loading of environment values.
+- **Backend behavior parity requires scoped task execution:** migration validation is only reliable when API tests/lint can be run in isolation and in CI.
+- **Scoped task execution requires CI path/affected scoping:** local filtering without CI filtering still causes noisy and slow pipelines.
+- **Contract-first API artifact flow requires independent app execution:** the contract producer (`api`) and consumer (`web`) must be decoupled to avoid lockstep runtime dependencies.
+- **Full web implementation conflicts with parity-first restructure:** adding product scope during structural migration creates mixed acceptance criteria and delays stability.
 
 ## MVP Definition
 
 ### Launch With (v1)
 
-Minimum viable product — what’s needed to support reliable automated usage.
+Minimum viable product — what's needed to validate the concept.
 
-- [ ] Deterministic prediction schema + explicit model/data timestamps — baseline contract stability for bots
-- [ ] Health/readiness split with dependency-aware readiness — safe automation and deployment behavior
-- [ ] Structured error taxonomy + retry-safe failure semantics — reliable client retry/orchestration logic
-- [ ] Timeouts/retries/circuit-breaker for upstream data calls — prevents hangs and cascading failures
-- [ ] Core metrics + request IDs + centralized logs — minimum observability for incident response
-- [ ] Rate limiting with quota feedback headers — protects service while enabling client-side pacing
+- [ ] Independent `api` and `web` run workflows — core milestone promise
+- [ ] App-local env file conventions and validation — required for runtime isolation
+- [ ] API parity verification after relocation to `api/` — preserves current product value
+- [ ] Root command surface + scoped execution (`api` only / `web` only) — required developer ergonomics
+- [ ] CI split for `api` vs `web` changes — prevents placeholder web from slowing API evolution
 
 ### Add After Validation (v1.x)
 
-Features to add once core reliability is proven in production.
+Features to add once core is working.
 
-- [ ] Champion–challenger/shadow predictions — add when model iteration cadence increases
-- [ ] Drift and model-quality monitors with alerts — add when enough live outcome data is accumulated
-- [ ] SLO status reporting endpoint — add once SLO targets are measured consistently for several weeks
+- [ ] Graph-aware affected execution — add when CI runtime starts increasing
+- [ ] Remote task caching — add when team/CI repetition cost is visible
+- [ ] Optional composed full-stack run command — add once both apps have active dev loops
 
 ### Future Consideration (v2+)
 
-Features to defer until product behavior is stable and trusted.
+Features to defer until product-market fit is established.
 
-- [ ] Backtest/replay API using production inference contract — defer until historical storage and reproducibility are hardened
-- [ ] Explainability response payloads — defer until latency budget and model-compatibility constraints are clear
+- [ ] App/package generators for scaled monorepo governance — defer until new packages are frequent
+- [ ] Rich API-to-web contract automation (typed SDK generation in CI) — defer until web implementation begins
 
 ## Feature Prioritization Matrix
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Deterministic prediction contract | HIGH | MEDIUM | P1 |
-| Health/readiness with dependency checks | HIGH | LOW | P1 |
-| Error taxonomy and failure semantics | HIGH | MEDIUM | P1 |
-| Upstream timeout/retry/circuit breaker | HIGH | MEDIUM | P1 |
-| Core observability metrics | HIGH | MEDIUM | P1 |
-| Rate limiting + quota feedback | HIGH | MEDIUM | P1 |
-| Champion-challenger/shadow mode | HIGH | HIGH | P2 |
-| Drift/model-quality monitoring | HIGH | HIGH | P2 |
-| SLO reporting endpoint | MEDIUM | MEDIUM | P2 |
-| Backtest/replay API | MEDIUM | HIGH | P3 |
-| Explainability payloads | MEDIUM | HIGH | P3 |
+| Independent app execution | HIGH | MEDIUM | P1 |
+| App-local env configuration | HIGH | MEDIUM | P1 |
+| API parity verification post-move | HIGH | HIGH | P1 |
+| Root command surface + scoped tasks | HIGH | LOW | P1 |
+| CI path/affected scoping | HIGH | MEDIUM | P1 |
+| Graph-aware affected pipelines | MEDIUM | MEDIUM | P2 |
+| Remote task cache | MEDIUM | MEDIUM | P2 |
+| Contract-first API artifact flow | MEDIUM | MEDIUM | P2 |
+| Scaffolding generators | LOW | HIGH | P3 |
 
 **Priority key:**
 - P1: Must have for launch
@@ -133,23 +119,23 @@ Features to defer until product behavior is stable and trusted.
 
 ## Competitor Feature Analysis
 
-| Feature Pattern | Ecosystem Example A | Ecosystem Example B | Recommended Approach for This Project |
-|----------------|---------------------|---------------------|----------------------------------------|
-| Safe model rollout | SageMaker production variants support traffic split and target variant invocation | Azure ML online endpoints support multi-deployment traffic routing + mirroring | Implement app-level shadow mode first, then weighted rollout mechanism |
-| Production monitoring | SageMaker Model Monitor supports data/model quality drift scheduling and alerts | Azure ML integrates endpoint metrics/logs with Azure Monitor and autoscaling | Start with first-party metrics + alerting; add drift monitors after prediction/outcome history exists |
-| API governance | Currency/market APIs commonly document rate limits, status codes, and quotas | (Observed across FX data API docs) | Standardize clear quota behavior and error docs early |
+| Feature | Turborepo-style workflow | Nx-style workflow | Our Approach |
+|---------|--------------------------|-------------------|--------------|
+| Scoped execution | `--filter` package/directory/change filters | `affected` + project graph | Start with simple path/package filters; evolve to graph-aware once needed |
+| Task acceleration | Local + remote cache via task hashing | Local + remote cache + affected integration | Add caching after baseline restructure is stable |
+| Task orchestration | Root `turbo run` scripts and pipeline config | Targets/pipelines in `nx.json` + `run-many` | Keep root commands stable and tooling-agnostic during initial migration |
 
 ## Sources
 
-- Project context: `.planning/PROJECT.md` (repo-local, HIGH)
-- FastAPI docs (exception handling, middleware, schema/OpenAPI patterns): https://github.com/fastapi/fastapi/tree/master/docs (via Context7, HIGH)
-- Prometheus Python client docs (Counter/Histogram/Gauge instrumentation patterns): https://github.com/prometheus/client_python (via Context7, HIGH)
-- AWS SageMaker Model Monitor (data/model quality monitoring): https://docs.aws.amazon.com/sagemaker/latest/dg/model-monitor.html (HIGH)
-- AWS SageMaker production variants/A-B testing: https://docs.aws.amazon.com/sagemaker/latest/dg/model-ab-testing.html (HIGH)
-- Azure ML online endpoints (traffic routing/mirroring, monitoring, autoscale): https://learn.microsoft.com/en-us/azure/machine-learning/concept-endpoints-online?view=azureml-api-2 (HIGH)
-- CurrencyAPI docs index (rate limit/quota/status-doc expectations): https://currencyapi.com/docs (MEDIUM)
-- Alpha Vantage docs (FX endpoints and premium/realtime entitlement patterns): https://www.alphavantage.co/documentation/ (MEDIUM)
+- Project scope and constraints: `.planning/PROJECT.md` (HIGH confidence, project-primary source)
+- pnpm workspace docs (workspace structure, release workflow, config): https://pnpm.io/workspaces (Last updated Mar 30, 2026) (HIGH confidence)
+- pnpm filtering docs (`--filter`, changed-since, scoped execution): https://pnpm.io/filtering (Last updated Mar 30, 2026) (HIGH confidence)
+- Turborepo running tasks docs (`turbo run`, filtering, automatic package scoping): https://turbo.build/repo/docs/crafting-your-repository/running-tasks (HIGH confidence)
+- Turborepo caching docs (local/remote cache behavior, hash inputs/outputs): https://turbo.build/repo/docs/core-concepts/caching (HIGH confidence)
+- Nx affected docs (`nx affected`, CI base/head strategy): https://nx.dev/docs/features/ci-features/affected (HIGH confidence)
+- Nx run tasks docs (run-many, pipelines, parallel execution): https://nx.dev/docs/features/run-tasks (HIGH confidence)
+- Nx cache task results docs (cacheable targets, remote cache): https://nx.dev/docs/features/cache-task-results (HIGH confidence)
 
 ---
-*Feature research for: Forex prediction API*
+*Feature research for: API+web monorepo restructure with independent app execution*
 *Researched: 2026-04-11*

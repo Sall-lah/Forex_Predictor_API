@@ -1,6 +1,6 @@
 # Architecture Research
 
-**Domain:** Production forex prediction API (brownfield FastAPI monolith)
+**Domain:** API + web monorepo migration (FastAPI backend + placeholder web app)
 **Researched:** 2026-04-11
 **Confidence:** HIGH
 
@@ -9,218 +9,184 @@
 ### System Overview
 
 ```text
-┌───────────────────────────────────────────────────────────────────────────────┐
-│                         Edge & API Control Layer                             │
-├───────────────────────────────────────────────────────────────────────────────┤
-│  LB/Ingress  →  FastAPI App                                                  │
-│                 ├─ Request ID + structured logging middleware                │
-│                 ├─ Rate-limit middleware (Redis-backed)                      │
-│                 ├─ AuthN/Z middleware (future)                               │
-│                 └─ Exception translation (domain error → HTTP contract)      │
-├───────────────────────────────────────────────────────────────────────────────┤
-│                           Application/Domain Layer                            │
-├───────────────────────────────────────────────────────────────────────────────┤
-│  HistoricDataService         PredictionService                               │
-│  ValidationService           Health/Readiness Service                        │
-│  ReliabilityPolicyService (timeouts/retries/circuit state)                  │
-├───────────────────────────────────────────────────────────────────────────────┤
-│                             Adapter/Integration Layer                         │
-├───────────────────────────────────────────────────────────────────────────────┤
-│  MarketDataAdapter (Kraken)   ModelRuntimeAdapter (LightGBM artifact)        │
-│  TelemetryAdapter (OpenTelemetry)   CacheAdapter (Redis)                     │
-│  PersistenceAdapter (Postgres/object store for audit + validation outputs)   │
-├───────────────────────────────────────────────────────────────────────────────┤
-│                           Data, Ops, and Offline Validation                   │
-├───────────────────────────────────────────────────────────────────────────────┤
-│  Redis (rate limit + hot cache)   Postgres (request/prediction audit)        │
-│  Object storage/model registry     Metrics/Trace backend (OTLP target)       │
-│  Scheduled validation jobs (backtest, drift, calibration checks)             │
-└───────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                           Monorepo Root                                 │
+├──────────────────────────────────────────────────────────────────────────┤
+│  apps/                                                                   │
+│  ├── api/   (FastAPI service, owns backend runtime + tests + env)       │
+│  └── web/   (frontend placeholder app, owns web runtime + env)           │
+├──────────────────────────────────────────────────────────────────────────┤
+│  tooling/                                                                 │
+│  ├── scripts/   (repo-wide helper scripts; no app business logic)        │
+│  ├── turbo.json (optional task graph for package-scoped runs)            │
+│  └── docs/      (migration and runbook docs)                              │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Component Responsibilities
 
 | Component | Responsibility | Typical Implementation |
 |-----------|----------------|------------------------|
-| API Router Layer | Endpoint composition and dependency injection only | `APIRouter` modules per feature, no business logic |
-| Domain Services | Prediction/data workflows, domain validation, policy enforcement | Plain Python services raising domain exceptions |
-| Market Data Adapter | Kraken API call envelope handling, retry/timeout policy, normalization | Reused `httpx.Client`/`AsyncClient` with explicit `Timeout`/`Limits` |
-| Model Runtime Adapter | Safe model loading, feature alignment contract, inference guardrails | Thread-safe singleton + startup warmup via lifespan |
-| Validation Subsystem | Input/output/model-contract checks + ongoing quality checks | Runtime validators + async validation jobs |
-| Operational Controls | Rate limiting, readiness, observability, configuration scope | Middleware + OTel + health/readiness endpoints |
+| `apps/api` | Own all backend code, Python deps, tests, model artifact paths, API run/start | Keep current FastAPI layered structure (`app/`, `tests/`, settings) moved under `apps/api/` |
+| `apps/web` | Own all frontend code and web run/start (placeholder now) | Minimal scaffold with independent package/runtime and starter route |
+| Repo root | Orchestrate cross-app commands and shared docs only | Task runner config (`turbo` optional), CI entrypoints, migration notes |
+| Shared config contract (not shared secrets) | Define interface between apps (URLs, API contract, CORS assumptions) | Checked-in examples (`.env.example` per app), OpenAPI/typed client later |
 
 ## Recommended Project Structure
 
 ```text
-app/
-├── api/                         # Router aggregation only
-├── core/                        # Settings, exception hierarchy, lifespan bootstrap
-├── middleware/                  # Cross-cutting controls (rate limit, request-id, auth)
-├── features/
-│   ├── historic_data/
-│   │   ├── router.py            # HTTP contract
-│   │   ├── service.py           # Use-case orchestration
-│   │   └── schemas.py           # DTOs
-│   ├── prediction/
-│   │   ├── router.py
-│   │   ├── service.py
-│   │   ├── validators.py        # Feature/output contract checks
-│   │   └── schemas.py
-│   └── validation/              # New: offline/online validation endpoints + jobs trigger
-├── adapters/
-│   ├── market_data/             # Kraken adapter + retries/circuit policy
-│   ├── model_runtime/           # Artifact loading/version metadata
-│   ├── cache/                   # Redis adapters
-│   └── telemetry/               # OpenTelemetry setup
-├── repositories/                # Audit/event persistence boundaries
-└── workers/                     # Scheduled backtesting/drift/calibration tasks
+Forex_Predictor_API/
+├── apps/
+│   ├── api/
+│   │   ├── app/                       # existing FastAPI code moved from root
+│   │   ├── tests/                     # existing tests moved with API
+│   │   ├── requirements.txt           # Python deps owned by API
+│   │   ├── environment.yml            # Conda env owned by API
+│   │   ├── pytest.ini                 # API test config
+│   │   ├── .env                       # API-only secrets/config (gitignored)
+│   │   └── .env.example               # API env contract
+│   ├── web/
+│   │   ├── src/                       # placeholder web source
+│   │   ├── package.json               # web deps/scripts
+│   │   ├── .env.local                 # web-only config (gitignored)
+│   │   └── .env.example               # web env contract
+│   └── README.md                      # app-specific run commands
+├── docs/
+│   └── migration/
+│       └── monorepo-move.md           # move plan + rollback checklist
+├── turbo.json                         # optional, for filtered runs per app
+└── .gitignore
 ```
 
 ### Structure Rationale
 
-- **Keep layered monolith:** right choice for current stage; add strict boundaries before microservices.
-- **Adapters as explicit boundary:** prevents Kraken/model/Redis details leaking into feature services.
-- **Validation as first-class module:** avoids treating quality checks as ad-hoc test scripts.
+- **`apps/api` boundary:** safest migration path is “move-as-is first, refactor second”. Keep backend internals unchanged while only updating import/run paths.
+- **`apps/web` boundary:** isolates future frontend decisions and avoids polluting backend dependency/runtime assumptions.
+- **Per-app env files:** prevents cross-app leakage and keeps local/dev/prod configuration explicit by ownership.
+- **Root as orchestrator only:** avoids accidental coupling; root should schedule tasks, not host app logic.
 
 ## Architectural Patterns
 
-### Pattern 1: Lifespan-managed startup for critical dependencies
+### Pattern 1: App-Owned Runtime Boundary
 
-**What:** Load/warm critical resources (model, Redis, telemetry) at startup and expose readiness based on successful initialization.
-**When to use:** Always in production; especially where inference depends on local artifacts.
-**Trade-offs:** Slightly longer startup; much safer runtime behavior.
+**What:** Each app owns its runtime, dependency manifest, and startup commands.
+**When to use:** Always for API + web monorepo where services must run independently.
+**Trade-offs:** Slight duplication (`.env.example`, scripts) but significantly lower coupling and safer releases.
 
 **Example:**
-```python
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
+```bash
+# API only
+python -m uvicorn app.main:app --reload --app-dir apps/api
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    app.state.model = load_model_or_fail()
-    app.state.http_client = build_http_client()
-    yield
-    app.state.http_client.close()
-
-app = FastAPI(lifespan=lifespan)
+# Web only (placeholder)
+npm run dev --prefix apps/web
 ```
 
-### Pattern 2: Ports-and-adapters around external dependencies
+### Pattern 2: Config Ownership + Explicit Consumption
 
-**What:** Domain services call abstract adapter interfaces; adapters own retries/timeouts/transport details.
-**When to use:** For Kraken, model registry, Redis, telemetry exporters.
-**Trade-offs:** More files/abstractions; major gain in testability and swap safety.
+**What:** Config is private to app boundary; cross-app values flow through explicit variables (e.g., `WEB_API_BASE_URL` in web, `ALLOWED_ORIGINS` in api).
+**When to use:** Any multi-app repo with independent deployability.
+**Trade-offs:** Requires discipline in naming/versioning config contract, but eliminates “hidden global env” failures.
 
-### Pattern 3: Split synchronous serving path from asynchronous validation path
+**Example (API settings):**
+```python
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-**What:** Keep `/predict` request path lean; run heavier validation (replay, drift, calibration, backtests) in scheduled/background workers.
-**When to use:** Required once operational confidence is a project goal.
-**Trade-offs:** Additional infrastructure; avoids p95/p99 latency spikes.
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=(".env",), env_file_encoding="utf-8")
+    api_prefix: str = "/api/v1"
+    allowed_origins: list[str] = ["http://localhost:3000"]
+```
+
+### Pattern 3: Filtered Task Execution (optional Turborepo)
+
+**What:** Use package filters so api/web run/test/build independently.
+**When to use:** Once web introduces Node tooling; useful for CI and local speed.
+**Trade-offs:** Adds toolchain complexity, but improves ergonomics and cacheability.
+
+**Example:**
+```bash
+turbo run dev --filter=api
+turbo run dev --filter=web
+```
 
 ## Data Flow
 
-### Request Flow (prediction)
+### Runtime/Data Flow Direction
 
 ```text
-Client
-  ↓
-Ingress/LB
-  ↓
-FastAPI middleware stack (request-id → rate limit → auth → exception map)
-  ↓
-Prediction router (schema validation)
-  ↓
-PredictionService
-  ├─→ MarketDataAdapter (Kraken OHLC fetch)
-  ├─→ Feature extraction + contract checks
-  ├─→ ModelRuntimeAdapter (predict_proba)
-  ├─→ Output validator (probability sanity/calibration guardrails)
-  └─→ Audit repository write (request, features hash, model version, response)
-  ↓
-API response + rate-limit headers + trace context
+[web app]
+   │  (HTTP calls using WEB_API_BASE_URL)
+   ▼
+[api routers/services]
+   │
+   ├──> [Kraken API]
+   └──> [Local model artifact in apps/api/.../ml_models]
 ```
 
-### Operational/Validation Flow (async)
+### Config Flow Direction (critical)
 
 ```text
-Scheduler/cron
-  ↓
-Validation worker
-  ├─→ Pull recent predictions + realized prices
-  ├─→ Compute directional accuracy, calibration, drift
-  ├─→ Persist validation metrics/history
-  ├─→ Emit telemetry + alerts on threshold breach
-  └─→ Optionally set model/route readiness flag to degraded
+apps/api/.env      ──> api Settings (pydantic-settings) ──> API runtime only
+apps/web/.env.local ─> web runtime config                ──> Web runtime only
+
+No direct .env sharing between apps.
+Cross-app coordination only through explicit public values
+(e.g., web knows API base URL; api knows allowed web origins).
 ```
 
-### Key Data Flows
+### Key Data/Config Flows
 
-1. **Serving flow (online):** Request → prediction in < strict timeout budget; failures are explicit (422/502/503), never silent fallback.
-2. **Trust flow (offline):** Predictions + realized outcomes → rolling validation metrics → operational decisions (alerts, degraded mode, rollback trigger).
+1. **Web → API:** web reads its own base URL config and sends HTTP to API endpoints.
+2. **API internal:** API reads only `apps/api/.env`, fetches OHLCV, runs prediction model, returns JSON.
+3. **CORS/control plane:** API allowlist references web origin via API-owned env key (not by reading web env file).
 
-## Component Boundaries (for roadmap planning)
+## Migration-Safe Build Order (for Roadmap Sequencing)
 
-| Boundary | Owns | Must NOT own |
-|----------|------|--------------|
-| `features/*/router.py` | HTTP contract, dependency wiring | Kraken calls, model logic, retries |
-| `features/*/service.py` | Use-case orchestration and domain rules | HTTP status codes, transport-level details |
-| `adapters/market_data` | HTTPX client reuse, timeout/limit/retry policy, envelope parse | Feature engineering, response DTO shaping |
-| `adapters/model_runtime` | Model loading/versioning/inference contract | Request parsing, external API calls |
-| `workers/validation` | Backtest/drift/calibration computations | Live request serving |
-| `middleware/*` | Cross-cutting controls (rate-limit, request-id, auth) | Domain prediction decisions |
+1. **Phase A — Establish boundaries without behavior changes**
+   - Create `apps/api` and `apps/web` skeleton.
+   - Move backend files into `apps/api` with minimal path edits.
+   - Keep endpoints and response contracts unchanged.
 
-## Suggested Build Order (subsequent milestone)
+2. **Phase B — Restore independent run/test parity**
+   - Update API run/test commands to execute from `apps/api`.
+   - Add placeholder `apps/web` run command.
+   - Verify API tests pass from new location before any refactor.
 
-1. **Harden serving path reliability first**
-   - Introduce lifespan startup/readiness separation (model + dependencies).
-   - Switch Kraken access to reusable HTTPX client with explicit timeout/limits and controlled retries.
-   - Add circuit-break/degraded-mode state for upstream data failures.
-   - *Why first:* prevents frequent incidents before adding more capabilities.
+3. **Phase C — Isolate env/config ownership**
+   - Introduce `apps/api/.env` and `apps/web/.env.local` patterns.
+   - Add per-app `.env.example` and fail-fast validation in startup.
+   - Remove/avoid root-level runtime `.env` dependence.
 
-2. **Operational controls second**
-   - Upgrade rate-limit storage from in-memory to Redis for multi-instance correctness.
-   - Add request IDs, structured logs, OpenTelemetry tracing/metrics.
-   - Add `/ready` endpoint with dependency checks (not just `/health`).
-   - *Why second:* once behavior is stable, make it observable and operable.
+4. **Phase D — Add repo orchestration (optional turbo/CI matrix)**
+   - Add filtered tasks (`--filter`) for app-specific runs.
+   - In CI, run API checks independently from web placeholder checks.
 
-3. **Validation capabilities third**
-   - Add prediction audit persistence (model version + features fingerprint + output).
-   - Add scheduled validation worker (accuracy, calibration, drift) and thresholds.
-   - Wire alerting/degraded toggles from validation outcomes.
-   - *Why third:* depends on observability and reliable data capture from prior steps.
+5. **Phase E — Contract hardening**
+   - Lock explicit API base URL + CORS contract.
+   - Add migration guardrails (smoke tests, rollback notes).
 
-4. **Scale refinements last**
-   - Add caching strategy for repeat pair/timeframe requests.
-   - Optimize feature computation hot paths and concurrency limits.
-   - Consider service split only after clear saturation signals.
-
-## Scaling Considerations
-
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| 0-1k active users | Single FastAPI deployment, layered monolith, Redis for rate limit/cache, strict timeout budgets |
-| 1k-100k | Multiple app replicas, centralized Redis + Postgres, full OTel dashboards + SLO alerting |
-| 100k+ | Separate prediction-serving and validation workers, potentially split market-data adapter into dedicated service |
+**Why this order:** it minimizes risk by preserving backend behavior first, then restoring operational parity, then tightening config isolation. Refactor/tooling comes after correctness is re-established.
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: “All logic in router/service blob”
+### Anti-Pattern 1: Root-Level Shared `.env` for Both Apps
 
-**What people do:** Mix HTTP handling, Kraken transport logic, feature engineering, and model loading in one module.
-**Why it’s wrong:** Reliability changes become risky and untestable; incident triage is slow.
-**Do this instead:** Keep strict boundaries: router → domain service → adapters.
+**What people do:** Keep one repo `.env` consumed by API and web.
+**Why it’s wrong:** Causes config leakage, accidental overrides, and deploy coupling.
+**Do this instead:** Use app-local env files and explicit cross-app contract keys.
 
-### Anti-Pattern 2: In-memory controls in multi-instance production
+### Anti-Pattern 2: Refactor While Relocating
 
-**What people do:** Keep rate limits/audit state only in process memory.
-**Why it’s wrong:** Limits become inconsistent across replicas; operational trust degrades.
-**Do this instead:** Use Redis/Postgres for shared state and deterministic behavior.
+**What people do:** Move folders and redesign architecture simultaneously.
+**Why it’s wrong:** Makes regressions hard to isolate and rollback risky.
+**Do this instead:** Move first with parity tests, then refactor in later phases.
 
-### Anti-Pattern 3: No explicit model/data contract versioning
+### Anti-Pattern 3: Shared Runtime Dependencies at Root
 
-**What people do:** Load model artifact and hope feature columns still match.
-**Why it’s wrong:** Silent prediction degradation or hard runtime failures.
-**Do this instead:** Enforce feature schema contract + model version metadata at startup and per request.
+**What people do:** Put Python and Node runtime deps in one global place.
+**Why it’s wrong:** Breaks independent runs and increases environment drift.
+**Do this instead:** Keep dependencies app-owned; root only orchestrates.
 
 ## Integration Points
 
@@ -228,27 +194,22 @@ Validation worker
 
 | Service | Integration Pattern | Notes |
 |---------|---------------------|-------|
-| Kraken Spot REST (OHLC) | Adapter with reusable HTTPX client, explicit timeouts/limits/retries | Handle upstream error envelope and throttling explicitly |
-| OTLP collector/observability backend | OpenTelemetry SDK export (trace/metrics/logs) | Ensure correlation IDs in logs and traces |
+| Kraken OHLC API | API-only outbound HTTP via `apps/api` service layer | Keep transport + parsing inside API boundary |
+| Model artifact | API local filesystem dependency | Use API-relative path config post-migration |
 
 ### Internal Boundaries
 
 | Boundary | Communication | Notes |
 |----------|---------------|-------|
-| Router ↔ Service | Direct dependency injection | Service raises domain exceptions only |
-| Service ↔ Adapters | Interface-based direct calls | Adapter-level resilience policies centralized |
-| API runtime ↔ Validation workers | DB/queue/event store | Async flow must not block request path |
+| `apps/web` ↔ `apps/api` | HTTP API contract only | No direct imports across app boundaries |
+| Repo root ↔ apps | Task orchestration only | Root should not own app secrets/runtime config |
 
 ## Sources
 
-- FastAPI docs (larger apps with `APIRouter`): https://fastapi.tiangolo.com/tutorial/bigger-applications/ (HIGH)
-- FastAPI docs/release notes (lifespan startup/shutdown pattern): https://fastapi.tiangolo.com/advanced/events/ and release notes examples (HIGH)
-- FastAPI docs (middleware order behavior): https://fastapi.tiangolo.com/tutorial/middleware/ (HIGH)
-- HTTPX docs (client reuse, resource limits, timeout tuning, transport retries): https://www.python-httpx.org/advanced/ (HIGH)
-- OpenTelemetry Python docs (SDK/exporters/instrumentation patterns): https://opentelemetry.io/docs/languages/python/ (HIGH)
-- Kraken API docs (REST limits and error behaviors): https://docs.kraken.com/api/docs/guides/spot-rest-ratelimits (MEDIUM — docs sections vary by product area; validate exact tier behavior for your account)
-- Current project architecture baseline: `.planning/PROJECT.md` + `app/*` module structure (HIGH)
+- FastAPI docs: Bigger Applications / `APIRouter` and `include_router` patterns (Context7: `/fastapi/fastapi`) — HIGH
+- Pydantic Settings docs: `env_file`, multiple dotenv files, source precedence customization (Context7: `/pydantic/pydantic-settings`) — HIGH
+- Turborepo docs: `--filter`, `envMode`, `globalDependencies` for env-aware task orchestration (Context7: `/vercel/turborepo`) — MEDIUM (optional tooling for this Python-first repo)
 
 ---
-*Architecture research for: Forex prediction API reliability hardening milestone*
+*Architecture research for: API + web monorepo migration*
 *Researched: 2026-04-11*
