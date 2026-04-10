@@ -15,7 +15,7 @@ print("Model loaded successfully!")
 
 #### 2. Model Input Parameters (Features)
 
-The loaded model expects input data in a pandas DataFrame format with the same 49 features used during training. These features are derived from the OHLCV data after feature extraction, labeling, and dropping the original 'open', 'high', 'low', 'close', 'labels', and 'asset' columns. The order of columns is important.
+The loaded model expects input data in a pandas DataFrame format with the same 63 features used during training. These features are derived from the OHLCV data after feature extraction, labeling, and dropping the original 'open', 'high', 'low', 'close', 'labels', and 'asset' columns. The order of columns is important.
 
 The features expected by the model are:
 
@@ -38,13 +38,28 @@ dummy_data = pd.DataFrame(columns=required_features)
 dummy_data.loc[0] = [0.0] * len(required_features)
 
 # Make predictions
-# For binary classification, predict_proba gives probability of each class
+# For multiclass classification (Hold: 0, Buy: 1, Sell: 2),
+# predict_proba gives the probability for each class in the order of class labels.
 predictions_proba = loaded_model.predict_proba(dummy_data)
 print(f"Predicted probabilities for dummy data: {predictions_proba}")
 
-# predict gives the class label (0 or 1)
+# To interpret the probabilities:
+# predictions_proba[0][0] is the probability of 'Hold' (class 0)
+# predictions_proba[0][1] is the probability of 'Buy' (class 1)
+# predictions_proba[0][2] is the probability of 'Sell' (class 2)
+
+print(f"Probability of Hold: {predictions_proba[0][0]:.4f}")
+print(f"Probability of Buy: {predictions_proba[0][1]:.4f}")
+print(f"Probability of Sell: {predictions_proba[0][2]:.4f}")
+
+# predict gives the class label (0, 1, or 2)
 predictions = loaded_model.predict(dummy_data)
 print(f"Predicted class for dummy data: {predictions}")
+
+# Map the predicted class label to its meaning
+class_mapping = {0: 'Hold', 1: 'Buy', 2: 'Sell'}
+predicted_action = class_mapping[predictions[0]]
+print(f"Predicted action for dummy data: {predicted_action}")
 ```
 
 **Key steps for preparing new data for prediction:**

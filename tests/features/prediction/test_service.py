@@ -9,6 +9,7 @@ Tests:
 - Feature extraction errors
 """
 
+from pathlib import Path
 from unittest.mock import Mock, MagicMock
 import pandas as pd
 import pytest
@@ -24,6 +25,7 @@ from app.features.prediction.service import (
     PredictionService,
     OHLCVPreprocessor,
     ModelLoader,
+    settings,
 )
 
 
@@ -65,9 +67,9 @@ def test_predict_success(mocker):
             "ema_9": [50000.0],
             "ema_21": [49800.0],
             "rsi_14h": [55.0],
+            "rsi_28h": [50.0],
             "volume": [100.0],
-            "asset": ["BTCUSD"],
-            # Add minimal feature set (in reality would have 49 features)
+            # Add minimal feature set (in reality would have more features)
         }
     )
 
@@ -76,7 +78,8 @@ def test_predict_success(mocker):
 
     # Mock model loader and prediction
     mock_model = Mock()
-    mock_model.predict_proba.return_value = [[0.35, 0.65]]  # 65% probability up
+    mock_model.feature_name_ = ["ema_9", "ema_21", "rsi_14h", "volume"]
+    mock_model.predict_proba.return_value = [[0.10, 0.65, 0.25]]
 
     # Mock the singleton's get_model method
     mocker.patch.object(ModelLoader, "get_model", return_value=mock_model)
@@ -89,6 +92,8 @@ def test_predict_success(mocker):
     assert response.pair == "XXBTZUSD"
     assert response.asset == "BTCUSD"
     assert response.probability_up == 0.65
+    assert response.probability_down == 0.25
+    assert response.probability_straight == 0.10
 
     # Verify method calls
     mock_api_client.assert_called_once()
@@ -282,7 +287,8 @@ def test_predict_different_asset(mocker):
     mock_features_df = pd.DataFrame(
         {
             "ema_9": [3000.0],
-            "asset": ["ETHUSD"],
+            "rsi_14h": [50.0],
+            "rsi_28h": [52.0],
         }
     )
 
@@ -290,7 +296,8 @@ def test_predict_different_asset(mocker):
     mock_preprocessor.return_value = mock_features_df
 
     mock_model = Mock()
-    mock_model.predict_proba.return_value = [[0.55, 0.45]]  # 45% probability up
+    mock_model.feature_name_ = ["ema_9", "rsi_14h"]
+    mock_model.predict_proba.return_value = [[0.25, 0.45, 0.30]]
 
     mocker.patch.object(ModelLoader, "get_model", return_value=mock_model)
 
@@ -301,6 +308,8 @@ def test_predict_different_asset(mocker):
     assert response.pair == "XETHZUSD"
     assert response.asset == "ETHUSD"
     assert response.probability_up == 0.45
+    assert response.probability_down == 0.30
+    assert response.probability_straight == 0.25
 
     # Verify preprocessor was called with correct asset
     mock_preprocessor.assert_called_once()
@@ -339,14 +348,117 @@ def test_predict_invalid_model_output_raises_data_validation_error(mocker):
     mocker.patch.object(
         service.preprocessor,
         "extract_features",
-        return_value=pd.DataFrame({"ema_9": [50000.0], "asset": ["BTCUSD"]}),
+        return_value=pd.DataFrame({"ema_9": [50000.0], "rsi_28h": [50.0]}),
     )
 
     mock_model = Mock()
-    mock_model.predict_proba.return_value = [[0.95]]  # missing class-1 probability
+    mock_model.feature_name_ = ["ema_9"]
+    mock_model.predict_proba.return_value = [[0.95]]
     mocker.patch.object(ModelLoader, "get_model", return_value=mock_model)
 
     with pytest.raises(DataValidationError, match="Invalid model output"):
+        service.predict(request)
+
+
+def test_predict_aligns_model_features_before_predict_proba(mocker):
+    """Prediction input should be reordered to the model feature contract."""
+    service = PredictionService()
+    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+
+    mocker.patch.object(
+        service.api_client,
+        "fetch_ohlcv_data",
+        return_value={
+            "error": [],
+            "result": {
+                "XXBTZUSD": [[1711000000, "1", "1", "1", "1", "1", "1", 1]] * 200,
+                "last": 1711000000,
+            },
+        },
+    )
+    mocker.patch.object(
+        service.preprocessor,
+        "extract_features",
+        return_value=pd.DataFrame(
+            [{"volume": 100.0, "ema_9": 50000.0, "rsi_14h": 55.0}]
+        ),
+    )
+
+    mock_model = Mock()
+    mock_model.feature_name_ = ["ema_9", "rsi_14h", "volume"]
+    mock_model.predict_proba.return_value = [[0.05, 0.8, 0.15]]
+    mocker.patch.object(ModelLoader, "get_model", return_value=mock_model)
+
+    response = service.predict(request)
+
+    assert response.probability_up == 0.8
+    assert response.probability_down == 0.15
+    assert response.probability_straight == 0.05
+    predict_input = mock_model.predict_proba.call_args[0][0]
+    assert list(predict_input.columns) == ["ema_9", "rsi_14h", "volume"]
+
+
+def test_predict_missing_model_required_feature_raises_data_validation_error(mocker):
+    """Missing model-required columns should fail before inference."""
+    service = PredictionService()
+    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+
+    mocker.patch.object(
+        service.api_client,
+        "fetch_ohlcv_data",
+        return_value={
+            "error": [],
+            "result": {
+                "XXBTZUSD": [[1711000000, "1", "1", "1", "1", "1", "1", 1]] * 200,
+                "last": 1711000000,
+            },
+        },
+    )
+    mocker.patch.object(
+        service.preprocessor,
+        "extract_features",
+        return_value=pd.DataFrame([{"ema_9": 50000.0, "volume": 100.0}]),
+    )
+
+    mock_model = Mock()
+    mock_model.feature_name_ = ["ema_9", "rsi_14h", "volume"]
+    mock_model.predict_proba.return_value = [[0.2, 0.8, 0.0]]
+    mocker.patch.object(ModelLoader, "get_model", return_value=mock_model)
+
+    with pytest.raises(DataValidationError, match="Missing model-required feature"):
+        service.predict(request)
+
+
+def test_predict_with_inf_feature_raises_data_validation_error(mocker):
+    """Aligned model features containing Inf/NaN should be rejected."""
+    service = PredictionService()
+    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+
+    mocker.patch.object(
+        service.api_client,
+        "fetch_ohlcv_data",
+        return_value={
+            "error": [],
+            "result": {
+                "XXBTZUSD": [[1711000000, "1", "1", "1", "1", "1", "1", 1]] * 200,
+                "last": 1711000000,
+            },
+        },
+    )
+    mocker.patch.object(
+        service.preprocessor,
+        "extract_features",
+        return_value=pd.DataFrame(
+            [{"ema_9": 50000.0, "rsi_14h": float("inf"), "volume": 100.0}]
+        ),
+    )
+
+    mock_model = Mock()
+    mock_model.feature_name_ = ["ema_9", "rsi_14h", "volume"]
+    mock_model.predict_proba.return_value = [[0.2, 0.8, 0.0]]
+    mocker.patch.object(ModelLoader, "get_model", return_value=mock_model)
+
+    with pytest.raises(DataValidationError, match="non-finite"):
         service.predict(request)
 
 
@@ -384,7 +496,8 @@ def test_predict_with_injected_mocks_orchestrates_dependencies():
     )
 
     mock_model = Mock()
-    mock_model.predict_proba.return_value = [[0.2, 0.8]]
+    mock_model.feature_name_ = ["ema_9", "rsi_14h", "volume"]
+    mock_model.predict_proba.return_value = [[0.2, 0.8, 0.0]]
 
     mock_model_loader = Mock(spec=ModelLoader)
     mock_model_loader.get_model.return_value = mock_model
@@ -401,8 +514,139 @@ def test_predict_with_injected_mocks_orchestrates_dependencies():
     assert response.pair == "XXBTZUSD"
     assert response.asset == "BTCUSD"
     assert response.probability_up == 0.8
+    assert response.probability_down == 0.0
+    assert response.probability_straight == 0.2
 
     mock_api_client.fetch_ohlcv_data.assert_called_once()
     mock_preprocessor.extract_features.assert_called_once()
     mock_model_loader.get_model.assert_called_once()
     mock_model.predict_proba.assert_called_once()
+
+
+def test_model_loader_missing_file_includes_resolved_path_in_error(monkeypatch):
+    """Missing model artifacts should report the resolved path clearly."""
+    model_dir = Path("tests/tmp/nonexistent-model-dir")
+    model_filename = "missing-model.pkl"
+    expected_path = (model_dir / model_filename).resolve()
+
+    monkeypatch.setattr(settings, "MODEL_DIR", str(model_dir))
+    monkeypatch.setattr(settings, "MODEL_FILENAME", model_filename)
+
+    with pytest.raises(ModelNotLoadedError) as exc_info:
+        ModelLoader._load_model()
+
+    message = str(exc_info.value)
+    assert "Resolved model path" in message
+    assert str(expected_path) in message
+
+
+def test_model_loader_deserialization_failure_includes_actionable_context(
+    monkeypatch, tmp_path
+):
+    """Unreadable artifacts should surface root cause and resolved path."""
+    artifact_path = tmp_path / "invalid-model.pkl"
+    artifact_path.write_text("not-a-joblib-model", encoding="utf-8")
+
+    monkeypatch.setattr(settings, "MODEL_DIR", str(tmp_path))
+    monkeypatch.setattr(settings, "MODEL_FILENAME", artifact_path.name)
+
+    with pytest.raises(ModelNotLoadedError) as exc_info:
+        ModelLoader._load_model()
+
+    message = str(exc_info.value)
+    assert "Resolved model path" in message
+    assert str(artifact_path.resolve()) in message
+    assert "Unable to deserialize model artifact" in message
+
+
+def test_model_loader_get_model_returns_loaded_model(monkeypatch, tmp_path):
+    """ModelLoader.get_model should load from configured path and cache it."""
+    artifact_path = tmp_path / "valid-model.pkl"
+    expected_model = {"name": "dummy-model"}
+    artifact_path.write_bytes(b"test")
+
+    monkeypatch.setattr(settings, "MODEL_DIR", str(tmp_path))
+    monkeypatch.setattr(settings, "MODEL_FILENAME", artifact_path.name)
+
+    mocked_joblib_load = MagicMock(return_value=expected_model)
+    monkeypatch.setattr(
+        "app.features.prediction.service.joblib.load", mocked_joblib_load
+    )
+
+    loader = ModelLoader()
+    loader.clear_cache()
+
+    loaded_model = loader.get_model()
+    loaded_model_cached = loader.get_model()
+
+    assert loaded_model == expected_model
+    assert loaded_model_cached == expected_model
+    mocked_joblib_load.assert_called_once_with(artifact_path.resolve())
+
+
+def test_predict_missing_model_file_reports_resolved_path(mocker, monkeypatch):
+    """PredictionService should surface resolved-path context for missing artifacts."""
+    service = PredictionService()
+    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+
+    mocker.patch.object(
+        service.api_client,
+        "fetch_ohlcv_data",
+        return_value={
+            "error": [],
+            "result": {
+                "XXBTZUSD": [[1711000000, "1", "1", "1", "1", "1", "1", 1]] * 200,
+                "last": 1711000000,
+            },
+        },
+    )
+    mocker.patch.object(
+        service.preprocessor,
+        "extract_features",
+        return_value=pd.DataFrame([{"ema_9": 50000.0, "rsi_28h": 50.0}]),
+    )
+
+    model_dir = Path("tests/tmp/missing-model")
+    model_filename = "missing-from-service.pkl"
+    expected_path = (model_dir / model_filename).resolve()
+    monkeypatch.setattr(settings, "MODEL_DIR", str(model_dir))
+    monkeypatch.setattr(settings, "MODEL_FILENAME", model_filename)
+
+    service.model_loader.clear_cache()
+
+    with pytest.raises(ModelNotLoadedError) as exc_info:
+        service.predict(request)
+
+    message = str(exc_info.value)
+    assert "Resolved model path" in message
+    assert str(expected_path) in message
+
+
+def test_predict_invalid_model_without_predict_proba_raises_model_not_loaded_error(
+    mocker,
+):
+    """PredictionService should reject loaded artifacts lacking predict_proba."""
+    service = PredictionService()
+    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+
+    mocker.patch.object(
+        service.api_client,
+        "fetch_ohlcv_data",
+        return_value={
+            "error": [],
+            "result": {
+                "XXBTZUSD": [[1711000000, "1", "1", "1", "1", "1", "1", 1]] * 200,
+                "last": 1711000000,
+            },
+        },
+    )
+    mocker.patch.object(
+        service.preprocessor,
+        "extract_features",
+        return_value=pd.DataFrame([{"ema_9": 50000.0, "rsi_28h": 50.0}]),
+    )
+
+    mocker.patch.object(ModelLoader, "get_model", return_value=object())
+
+    with pytest.raises(ModelNotLoadedError, match="predict_proba"):
+        service.predict(request)

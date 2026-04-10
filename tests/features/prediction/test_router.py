@@ -18,6 +18,40 @@ from app.core.exceptions import (
 from app.features.prediction.schemas import PredictionResponse
 
 
+def test_prediction_response_success_with_probabilities() -> None:
+    """Test PredictionResponse accepts canonical probability fields."""
+    response = PredictionResponse(
+        pair="XXBTZUSD",
+        asset="BTCUSD",
+        probability_up=0.72,
+        probability_down=0.18,
+        probability_straight=0.10,
+    )
+
+    assert response.probability_up == 0.72
+    assert response.probability_down == 0.18
+    assert response.probability_straight == 0.10
+
+
+def test_prediction_response_success_serialization_contract_fields() -> None:
+    """Test PredictionResponse serializes canonical response contract keys only."""
+    payload = PredictionResponse(
+        pair="XXBTZUSD",
+        asset="BTCUSD",
+        probability_up=0.72,
+        probability_down=0.18,
+        probability_straight=0.10,
+    ).model_dump()
+
+    assert payload == {
+        "pair": "XXBTZUSD",
+        "asset": "BTCUSD",
+        "probability_up": 0.72,
+        "probability_down": 0.18,
+        "probability_straight": 0.10,
+    }
+
+
 def test_predict_endpoint_success(client, mocker):
     """Test successful prediction via API endpoint."""
     # Mock the service's predict method
@@ -25,6 +59,8 @@ def test_predict_endpoint_success(client, mocker):
         pair="XXBTZUSD",
         asset="BTCUSD",
         probability_up=0.72,
+        probability_down=0.18,
+        probability_straight=0.10,
     )
 
     # Patch the PredictionService class
@@ -46,9 +82,18 @@ def test_predict_endpoint_success(client, mocker):
     # Assert
     assert response.status_code == 200
     data = response.json()
+    assert set(data.keys()) == {
+        "pair",
+        "asset",
+        "probability_up",
+        "probability_down",
+        "probability_straight",
+    }
     assert data["pair"] == "XXBTZUSD"
     assert data["asset"] == "BTCUSD"
     assert data["probability_up"] == 0.72
+    assert data["probability_down"] == 0.18
+    assert data["probability_straight"] == 0.10
 
 
 def test_predict_endpoint_ethusd(client, mocker):
@@ -58,6 +103,8 @@ def test_predict_endpoint_ethusd(client, mocker):
         pair="XETHZUSD",
         asset="ETHUSD",
         probability_up=0.58,
+        probability_down=0.32,
+        probability_straight=0.10,
     )
 
     mock_service_class = mocker.patch(
@@ -78,8 +125,17 @@ def test_predict_endpoint_ethusd(client, mocker):
     # Assert
     assert response.status_code == 200
     data = response.json()
+    assert set(data.keys()) == {
+        "pair",
+        "asset",
+        "probability_up",
+        "probability_down",
+        "probability_straight",
+    }
     assert data["asset"] == "ETHUSD"
     assert data["probability_up"] == 0.58
+    assert data["probability_down"] == 0.32
+    assert data["probability_straight"] == 0.10
 
 
 def test_predict_endpoint_invalid_asset(client):
@@ -219,6 +275,8 @@ def test_predict_endpoint_probability_range(client, mocker):
         pair="XXBTZUSD",
         asset="BTCUSD",
         probability_up=0.0,
+        probability_down=1.0,
+        probability_straight=0.0,
     )
 
     response = client.post(
@@ -227,12 +285,16 @@ def test_predict_endpoint_probability_range(client, mocker):
 
     assert response.status_code == 200
     assert response.json()["probability_up"] == 0.0
+    assert response.json()["probability_down"] == 1.0
+    assert response.json()["probability_straight"] == 0.0
 
     # Test with 1.0
     mock_service_instance.predict.return_value = PredictionResponse(
         pair="XXBTZUSD",
         asset="BTCUSD",
         probability_up=1.0,
+        probability_down=0.0,
+        probability_straight=0.0,
     )
 
     response = client.post(
@@ -241,3 +303,5 @@ def test_predict_endpoint_probability_range(client, mocker):
 
     assert response.status_code == 200
     assert response.json()["probability_up"] == 1.0
+    assert response.json()["probability_down"] == 0.0
+    assert response.json()["probability_straight"] == 0.0

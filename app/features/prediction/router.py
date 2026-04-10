@@ -33,14 +33,14 @@ async def predict_price_movement(
 
     Fetches 1 week of hourly OHLCV data from Kraken, extracts technical
     indicators and custom features, then uses a trained LightGBM model
-    to predict the probability of upward price movement.
+    to predict the probability of price movement classes.
 
     Args:
         request: Trading pair and asset information
         service: Injected PredictionService instance
 
     Returns:
-        Prediction probability for upward movement (0.0 to 1.0)
+        Prediction probabilities for straight, upward, and downward movement
 
     Raises:
         502: If fetching data from Kraken fails
