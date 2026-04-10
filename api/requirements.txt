@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+python-dotenv
+pydantic
+pydantic-settings
+httpx
+ta==0.11.0
+pandas==2.2.2
+numpy==2.0.2
+joblib==1.5.3
+scikit-learn==1.6.1
+lightgbm==4.6.0
+pytest
+pytest-cov
+pytest-mock
