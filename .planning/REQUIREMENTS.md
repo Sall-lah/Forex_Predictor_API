@@ -7,16 +7,16 @@
 
 ### Monorepo Setup
 
-- [ ] **MONO-01**: Create a frontend application in the `/web/` directory
-- [ ] **MONO-02**: Use React for the frontend UI
-- [ ] **MONO-03**: Use Express for the frontend server/API gateway (Backend-for-Frontend proxy)
-- [ ] **MONO-04**: Create a unified startup script (e.g. using concurrently) to run both the FastAPI bot API and the Express web server concurrently with a single command
+- [x] **MONO-01**: Create a frontend application in the `/web/` directory
+- [x] **MONO-02**: Use React for the frontend UI
+- [x] **MONO-03**: Use Express for the frontend server/API gateway (Backend-for-Frontend proxy)
+- [x] **MONO-04**: Create a unified startup script (e.g. using concurrently) to run both the FastAPI bot API and the Express web server concurrently with a single command
 
 ### UI Design & Integration
 
 - [ ] **UI-01**: Use the Stitch project "Forex Predictor Dashboard" for the design system
 - [ ] **UI-02**: Use "Forex Dashboard with SL/TP Controls" as the specific frontend template/screen
-- [ ] **UI-03**: Integrate Context7 MCPs for documentation during development where necessary
+- [x] **UI-03**: Integrate Context7 MCPs for documentation during development where necessary
 
 ### Dashboard Features
 
@@ -54,13 +54,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MONO-01 | Phase 1 | Pending |
-| MONO-02 | Phase 1 | Pending |
-| MONO-03 | Phase 1 | Pending |
-| MONO-04 | Phase 1 | Pending |
+| MONO-01 | Phase 1 | Complete |
+| MONO-02 | Phase 1 | Complete |
+| MONO-03 | Phase 1 | Complete |
+| MONO-04 | Phase 1 | Complete |
 | UI-01 | Phase 2 | Pending |
 | UI-02 | Phase 2 | Pending |
-| UI-03 | Phase 1 | Pending |
+| UI-03 | Phase 1 | Complete |
 | DASH-01 | Phase 2 | Pending |
 | DASH-02 | Phase 2 | Pending |
 | DASH-03 | Phase 3 | Pending |
