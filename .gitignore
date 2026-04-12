@@ -1,7 +1,7 @@
+node_modules
 .agents
 .env
 AGENTS.md
-.planning
 CLAUDE.md
 .coverage
 # app/features/prediction/ml_models/MODEL_USAGE.md
