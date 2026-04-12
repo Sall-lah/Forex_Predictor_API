@@ -1,64 +1,50 @@
-# Roadmap: Forex Predictor API Monorepo Restructure
-
-## Overview
-
-This roadmap delivers a safe monorepo migration in three coarse phases: first establish new app boundaries without backend regressions, then enforce app-local runtime isolation with independent execution, and finally complete root workflow, CI scoping, and onboarding documentation so daily development works cleanly across both apps.
+# Roadmap
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
-
-Decimal phases appear between their surrounding integers in numeric order.
-
-- [x] **Phase 1: App Boundary Migration & Backend Parity** - Restructure into `api/` + `web/` placeholder while preserving API behavior. (completed 2026-04-12)
-- [ ] **Phase 2: Runtime Isolation & Independent App Execution** - Make each app self-contained for env configuration and local startup.
-- [ ] **Phase 3: Monorepo Workflow, CI Scoping & Onboarding Docs** - Finalize root/scoped workflows and documentation for reliable day-to-day use.
+- [ ] **Phase 1: Foundation & Orchestration** - Unified monorepo setup with Express proxy and React scaffold
+- [ ] **Phase 2: UI Baseline & Data Visualization** - Stitch template integration and live market charting
+- [ ] **Phase 3: Trading Controls & Prediction Integration** - ML prediction overlay and risk management inputs
 
 ## Phase Details
 
-### Phase 1: App Boundary Migration & Backend Parity
-**Goal**: Developers can work in a monorepo layout with clear `api/` and `web/` app boundaries while existing backend API behavior remains unchanged after migration.
-**Depends on**: Nothing (first phase)
-**Requirements**: STRU-01, STRU-02, STRU-03, PAR-01
+### Phase 1: Foundation & Orchestration
+**Goal**: Both applications can be started together with a single command, with traffic routing properly between them.
+**Depends on**: None
+**Requirements**: MONO-01, MONO-02, MONO-03, MONO-04, UI-03
 **Success Criteria** (what must be TRUE):
-  1. Developer can see and navigate a top-level repo layout that separates backend and frontend app directories (`api/` and `web/`).
-  2. Backend source code, tests, and runtime assets are owned under `api/` and no longer require root-level app paths.
-  3. Developer can start `web/` as a runnable placeholder application.
-  4. Existing backend endpoints return parity-equivalent responses after the move to `api/`.
+  1. Running a single command from the project root starts both the FastAPI backend and Express web server.
+  2. Stopping the runner cleanly terminates both processes without leaving zombie instances.
+  3. The React app is accessible in the browser and successfully routes API requests to the backend via the Express proxy.
 **Plans**: TBD
 
-### Phase 2: Runtime Isolation & Independent App Execution
-**Goal**: Developers can configure and run each app independently with app-local environment contracts and clear validation failures.
+### Phase 2: UI Baseline & Data Visualization
+**Goal**: Users can view a styled dashboard displaying live market data and backend connectivity.
 **Depends on**: Phase 1
-**Requirements**: ENV-01, ENV-02, ENV-03, EXEC-01, EXEC-02
+**Requirements**: UI-01, UI-02, DASH-01, DASH-02, DASH-05
 **Success Criteria** (what must be TRUE):
-  1. Developer can configure backend runtime using `api/.env` (with `api/.env.example`) without relying on root-level `.env` values.
-  2. Developer can configure web placeholder runtime using `web/.env` or `web/.env.local` (with example file) independently from backend values.
-  3. Invalid or missing app configuration fails with clear, app-specific validation errors.
-  4. Developer can run backend independently from `api/` using canonical local development commands.
-  5. Developer can run web placeholder independently from `web/` using canonical local development commands.
+  1. Dashboard renders with the "Forex Dashboard with SL/TP Controls" Stitch template and design system.
+  2. User can view an OHLCV candlestick chart populated with live historic data fetched from the backend.
+  3. The current market price is distinctly displayed alongside the chart.
+  4. A visual indicator accurately shows whether the backend/Kraken connection is healthy or failing.
 **Plans**: TBD
+**UI hint**: yes
 
-### Phase 3: Monorepo Workflow, CI Scoping & Onboarding Docs
-**Goal**: Developers and CI can execute root-level and app-scoped workflows reliably, with onboarding docs that match the new monorepo operating model.
+### Phase 3: Trading Controls & Prediction Integration
+**Goal**: Users can see ML predictions and input risk management parameters on the dashboard.
 **Depends on**: Phase 2
-**Requirements**: WORK-01, WORK-02, CI-01, DOCS-01
+**Requirements**: DASH-03, DASH-04
 **Success Criteria** (what must be TRUE):
-  1. Developer can run root-level convenience commands that delegate to app-scoped commands without coupling app runtimes.
-  2. Developer can run lint/test/dev tasks for only one selected app (`api` or `web`).
-  3. CI executes backend and web placeholder checks through app-scoped paths so unrelated app changes do not block each other.
-  4. A new developer can follow onboarding docs to understand structure and run both apps with the documented independent command flow.
+  1. The dashboard explicitly shows the LightGBM model's latest price movement prediction.
+  2. User can type numerical values into Stop Loss (SL) and Take Profit (TP) input fields.
+  3. The interface updates to reflect the latest prediction state after fetching from the backend.
 **Plans**: TBD
+**UI hint**: yes
 
 ## Progress
 
-**Execution Order:**
-Phases execute in numeric order: 1 → 1.1 → 2 → 2.1 → 3
-
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. App Boundary Migration & Backend Parity | 2/2 | Complete   | 2026-04-12 |
-| 2. Runtime Isolation & Independent App Execution | 0/TBD | Not started | - |
-| 3. Monorepo Workflow, CI Scoping & Onboarding Docs | 0/TBD | Not started | - |
+| 1. Foundation & Orchestration | 0/0 | Not started | - |
+| 2. UI Baseline & Data Visualization | 0/0 | Not started | - |
+| 3. Trading Controls & Prediction Integration | 0/0 | Not started | - |
