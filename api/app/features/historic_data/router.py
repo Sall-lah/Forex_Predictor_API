@@ -38,6 +38,11 @@ async def get_live_data(
         description="Kraken trading pair (e.g., 'BTC/UDS', 'ETH/USD')",
         examples=["BTC/USD"],
     ),
+    interval: int = Query(
+        60,
+        description="Time frame interval in minutes",
+        enum=[1, 5, 15, 30, 60, 240, 1440, 10080, 21600],
+    ),
     service: HistoricDataService = Depends(get_service),
 ) -> HistoricDataResponse:
     """
@@ -45,9 +50,10 @@ async def get_live_data(
 
     Args:
         pair: Kraken asset pair identifier
+        interval: Time frame interval in minutes (default 60)
         service: Injected service instance
 
     Returns:
         Response with OHLCV records
     """
-    return service.fetch_hourly_ohlcv(pair)
+    return service.fetch_hourly_ohlcv(pair, interval=interval)

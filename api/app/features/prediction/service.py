@@ -288,7 +288,9 @@ class OHLCVPreprocessor:
         df["roc_1h"] = momentum.ROCIndicator(close=close, window=1).roc()
 
         # Williams %R
-        df["william_r"] = momentum.WilliamsRIndicator(high=high, low=low, close=close).williams_r()
+        df["william_r"] = momentum.WilliamsRIndicator(
+            high=high, low=low, close=close
+        ).williams_r()
 
         # Ultimate Oscillator
         df["ultimate_oscillator"] = momentum.UltimateOscillator(
@@ -317,7 +319,9 @@ class OHLCVPreprocessor:
         low = df["low"]
 
         # Average True Range
-        df["atr"] = volatility.AverageTrueRange(high=high, low=low, close=close).average_true_range()
+        df["atr"] = volatility.AverageTrueRange(
+            high=high, low=low, close=close
+        ).average_true_range()
 
         # Bollinger Bands
         bollinger = volatility.BollingerBands(close=close)
@@ -353,32 +357,58 @@ class OHLCVPreprocessor:
         df["custom_hl_range_pct"] = (high - low) / close
 
         # Trend consistency (close > EMA50 over last 24 periods)
-        df['custom_trend_consistency'] = (close > close.rolling(50).mean()).astype(int).rolling(24).sum() / 24
+        df["custom_trend_consistency"] = (close > close.rolling(50).mean()).astype(
+            int
+        ).rolling(24).sum() / 24
 
         # Volatility calculations (rolling std of pct_change)
-        df['custom_3d_volatility'] = close.pct_change().rolling(window=72).std()
-        df['custom_2d_volatility'] = close.pct_change().rolling(window=48).std()
-        df['custom_24h_volatility'] = close.pct_change().rolling(window=24).std()
-        df['custom_12h_volatility'] = close.pct_change().rolling(window=12).std()
-        df['custom_4h_volatility'] = close.pct_change().rolling(window=4).std()
-        df['custom_2h_volatility'] = close.pct_change().rolling(window=2).std()
+        df["custom_3d_volatility"] = close.pct_change().rolling(window=72).std()
+        df["custom_2d_volatility"] = close.pct_change().rolling(window=48).std()
+        df["custom_24h_volatility"] = close.pct_change().rolling(window=24).std()
+        df["custom_12h_volatility"] = close.pct_change().rolling(window=12).std()
+        df["custom_4h_volatility"] = close.pct_change().rolling(window=4).std()
+        df["custom_2h_volatility"] = close.pct_change().rolling(window=2).std()
 
         # Close position within rolling high-low range
-        df['custom_close_pos_3d'] = (close - low.rolling(72).min()) / (high.rolling(72).max() - low.rolling(72).min() + 1e-9)
-        df['custom_close_pos_2d'] = (close - low.rolling(48).min()) / (high.rolling(48).max() - low.rolling(48).min() + 1e-9)
-        df['custom_close_pos_24h'] = (close - low.rolling(24).min()) / (high.rolling(24).max() - low.rolling(24).min() + 1e-9)
-        df['custom_close_pos_12h'] = (close - low.rolling(12).min()) / (high.rolling(12).max() - low.rolling(12).min() + 1e-9)
-        df['custom_close_pos_4h'] = (close - low.rolling(6).min()) / (high.rolling(6).max() - low.rolling(6).min() + 1e-9)
-        df['custom_close_pos_2h'] = (close - low.rolling(4).min()) / (high.rolling(4).max() - low.rolling(4).min() + 1e-9)
+        df["custom_close_pos_3d"] = (close - low.rolling(72).min()) / (
+            high.rolling(72).max() - low.rolling(72).min() + 1e-9
+        )
+        df["custom_close_pos_2d"] = (close - low.rolling(48).min()) / (
+            high.rolling(48).max() - low.rolling(48).min() + 1e-9
+        )
+        df["custom_close_pos_24h"] = (close - low.rolling(24).min()) / (
+            high.rolling(24).max() - low.rolling(24).min() + 1e-9
+        )
+        df["custom_close_pos_12h"] = (close - low.rolling(12).min()) / (
+            high.rolling(12).max() - low.rolling(12).min() + 1e-9
+        )
+        df["custom_close_pos_4h"] = (close - low.rolling(6).min()) / (
+            high.rolling(6).max() - low.rolling(6).min() + 1e-9
+        )
+        df["custom_close_pos_2h"] = (close - low.rolling(4).min()) / (
+            high.rolling(4).max() - low.rolling(4).min() + 1e-9
+        )
 
         # Volatility-adjusted returns
-        df['custom_3d_vol_adj_return'] = close.pct_change() / (df['custom_3d_volatility'] + 1e-9)
-        df['custom_2d_vol_adj_return'] = close.pct_change() / (df['custom_2d_volatility'] + 1e-9)
-        df['custom_24h_vol_adj_return'] = close.pct_change() / (df['custom_24h_volatility'] + 1e-9)
-        df['custom_12h_vol_adj_return'] = close.pct_change() / (df['custom_12h_volatility'] + 1e-9)
-        df['custom_4h_vol_adj_return'] = close.pct_change() / (df['custom_4h_volatility'] + 1e-9)
-        df['custom_2h_vol_adj_return'] = close.pct_change() / (df['custom_2h_volatility'] + 1e-9)
-        
+        df["custom_3d_vol_adj_return"] = close.pct_change() / (
+            df["custom_3d_volatility"] + 1e-9
+        )
+        df["custom_2d_vol_adj_return"] = close.pct_change() / (
+            df["custom_2d_volatility"] + 1e-9
+        )
+        df["custom_24h_vol_adj_return"] = close.pct_change() / (
+            df["custom_24h_volatility"] + 1e-9
+        )
+        df["custom_12h_vol_adj_return"] = close.pct_change() / (
+            df["custom_12h_volatility"] + 1e-9
+        )
+        df["custom_4h_vol_adj_return"] = close.pct_change() / (
+            df["custom_4h_volatility"] + 1e-9
+        )
+        df["custom_2h_vol_adj_return"] = close.pct_change() / (
+            df["custom_2h_volatility"] + 1e-9
+        )
+
         return df
 
 
@@ -434,7 +464,7 @@ class PredictionService:
             DataValidationError: If data validation fails
             ModelNotLoadedError: If ML model cannot be loaded
         """
-        historic_df = self._fetch_historic_dataframe(request.pair)
+        historic_df = self._fetch_historic_dataframe(request)
         feature_df = self._extract_features(historic_df, request)
         latest_features = self._select_latest_feature_row(feature_df)
         probabilities = self._predict_probabilities(request.pair, latest_features)
@@ -456,15 +486,20 @@ class PredictionService:
             probability_straight=prob_straight,
         )
 
-    def _fetch_historic_dataframe(self, pair: str) -> pd.DataFrame:
+    def _fetch_historic_dataframe(self, request: PredictionRequest) -> pd.DataFrame:
         """Fetch and parse Kraken OHLCV payload into a DataFrame."""
-        logger.info("Fetching OHLCV data for '%s'", pair)
+        logger.info("Fetching OHLCV data for '%s'", request.pair)
         payload = self.api_client.fetch_ohlcv_data(
-            pair, settings.PREDICTION_FETCH_HOURS
+            request.pair, settings.PREDICTION_FETCH_HOURS, interval=request.interval
         )
         ohlcv_data = OHLCVDataFrame.from_kraken_response(payload)
 
-        logger.info("Fetched %d hourly candles for '%s'", len(ohlcv_data.df), pair)
+        logger.info(
+            "Fetched %d candles for '%s' (interval: %dm)",
+            len(ohlcv_data.df),
+            request.pair,
+            request.interval,
+        )
         return ohlcv_data.df
 
     def _extract_features(

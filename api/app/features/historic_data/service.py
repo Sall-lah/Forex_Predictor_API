@@ -17,9 +17,11 @@ class HistoricDataService:
         """Initialize service with optional Kraken client dependency."""
         self.api_client = api_client or KrakenAPIClient()
 
-    def fetch_hourly_ohlcv(self, pair: str) -> HistoricDataResponse:
-        """Fetch one week of hourly OHLCV candles for the given pair."""
-        payload = self.api_client.fetch_ohlcv_data(pair, settings.KRAKEN_DEFAULT_HOURS)
+    def fetch_hourly_ohlcv(self, pair: str, interval: int = 60) -> HistoricDataResponse:
+        """Fetch one week of OHLCV candles for the given pair and interval."""
+        payload = self.api_client.fetch_ohlcv_data(
+            pair, settings.KRAKEN_DEFAULT_HOURS, interval=interval
+        )
 
         ohlcv_data = OHLCVDataFrame.from_kraken_response(payload)
         ohlcv_data.validate()
@@ -27,9 +29,10 @@ class HistoricDataService:
         records = [OHLCVRecord(**row) for row in ohlcv_data.to_records()]
 
         logger.info(
-            "Fetched Kraken data for '%s' — %d hourly candles",
+            "Fetched Kraken data for '%s' — %d candles (interval: %dm)",
             pair,
             len(records),
+            interval,
         )
 
         return HistoricDataResponse(
