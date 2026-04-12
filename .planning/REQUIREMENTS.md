@@ -1,60 +1,52 @@
-# Requirements: Forex Predictor API Monorepo Restructure
+# Requirements: Forex Predictor Monorepo & Frontend
 
-**Defined:** 2026-04-11
-**Core Value:** Both applications can run independently with isolated environment configuration, while preserving current API functionality during the migration.
+**Defined:** 2026-04-12
+**Core Value:** A unified, easily runnable Forex trading dashboard that combines the existing backend prediction engine with a new React-based user interface.
 
 ## v1 Requirements
 
-Requirements for initial migration release. Each maps to exactly one roadmap phase.
+### Monorepo Setup
 
-### Repository Structure
+- [ ] **MONO-01**: Create a frontend application in the `/web/` directory
+- [ ] **MONO-02**: Use React for the frontend UI
+- [ ] **MONO-03**: Use Express for the frontend server/API gateway (Backend-for-Frontend proxy)
+- [ ] **MONO-04**: Create a unified startup script (e.g. using concurrently) to run both the FastAPI bot API and the Express web server concurrently with a single command
 
-- [x] **STRU-01**: Developer can see a repository layout with separate top-level application directories for backend and frontend (`api/` and `web/`).
-- [x] **STRU-02**: Existing backend service code, tests, and runtime assets are migrated into `api/` with clear app-local ownership.
-- [x] **STRU-03**: Developer can start `web/` as a runnable placeholder app without frontend feature implementation.
+### UI Design & Integration
 
-### Runtime and Environment Isolation
+- [ ] **UI-01**: Use the Stitch project "Forex Predictor Dashboard" for the design system
+- [ ] **UI-02**: Use "Forex Dashboard with SL/TP Controls" as the specific frontend template/screen
+- [ ] **UI-03**: Integrate Context7 MCPs for documentation during development where necessary
 
-- [ ] **ENV-01**: Developer can configure backend runtime using `api/.env` (and `api/.env.example`) without depending on root-level `.env` values.
-- [ ] **ENV-02**: Developer can configure frontend placeholder runtime using `web/.env` or `web/.env.local` (with example file) independently from backend env values.
-- [ ] **ENV-03**: Developer gets app-specific configuration validation so invalid/missing env values fail clearly in the relevant app.
+### Dashboard Features
 
-### Independent Execution and Parity
-
-- [ ] **EXEC-01**: Developer can run backend app independently from `api/` using canonical commands documented for local development.
-- [ ] **EXEC-02**: Developer can run frontend placeholder independently from `web/` using canonical commands documented for local development.
-- [x] **PAR-01**: Existing backend API endpoints preserve behavior parity after migration to `api/`.
-
-### Developer Workflow and CI
-
-- [ ] **WORK-01**: Developer can run root-level convenience commands that delegate to app-scoped commands without coupling app runtimes.
-- [ ] **WORK-02**: Developer can run scoped tasks for only one app (`api` or `web`) during lint/test/dev workflows.
-- [ ] **CI-01**: CI can evaluate backend and frontend placeholder through app-scoped execution paths (path- or target-scoped), so web placeholder changes do not block unrelated backend checks.
-
-### Documentation and Onboarding
-
-- [ ] **DOCS-01**: Developer can follow updated onboarding/run docs that describe the new monorepo structure and independent app commands.
+- [ ] **DASH-01**: Display Live Price Chart (OHLCV) using data from `/api/v1/historic-data/live`
+- [ ] **DASH-02**: Display Current Market Price clearly
+- [ ] **DASH-03**: Display Prediction Overlay / Status showing the LightGBM model's next prediction from `/api/v1/prediction/predict`
+- [ ] **DASH-04**: Provide manual input controls for Stop Loss (SL) and Take Profit (TP)
+- [ ] **DASH-05**: Display API Connectivity Status to show health of the backend/Kraken connection
 
 ## v2 Requirements
 
-Deferred until migration baseline is stable.
+Deferred to future release.
 
-### Monorepo Enhancements
+### Advanced Features
 
-- **MREP-01**: Developer can use affected-graph task execution for faster CI and local runs.
-- **MREP-02**: Developer can use remote task caching for lint/test/build workflows.
-- **MREP-03**: Frontend can consume an automated API contract artifact pipeline (OpenAPI-to-client workflow).
+- **FEAT-01**: Visual SL/TP Dragging on Chart
+- **FEAT-02**: Prediction Confidence Gauge (if backend exposes probability)
+- **FEAT-03**: Backtest Simulation Overlay
+- **FEAT-04**: Dynamic SL/TP Recommendations based on volatility
 
 ## Out of Scope
 
-Explicitly excluded from this initialization scope.
+Explicitly excluded. Documented to prevent scope creep.
 
 | Feature | Reason |
 |---------|--------|
-| Full frontend feature implementation in `web/` | Current scope is structural migration and placeholder setup only. |
-| Prediction-model redesign or retraining changes | Request focuses on folder/runtime restructuring, not ML capability changes. |
-| Breaking API contract changes during migration | Migration goal is parity, not product-level API redesign. |
-| Multi-orchestrator tooling rollout in one milestone | Adds complexity and migration risk before baseline structure is stable. |
+| Direct Order Execution / Wallet Management | Out of scope, massive regulatory/security risk. Purely informational dashboard. |
+| Multi-Exchange Aggregation | Backend is Kraken-focused. Adding others breaks scope. |
+| Social Trading / Chat | Distraction from core AI prediction value proposition. |
+| Changes to existing ML model | Focus is entirely on frontend integration and monorepo setup. |
 
 ## Traceability
 
@@ -62,25 +54,24 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STRU-01 | Phase 1 | Complete |
-| STRU-02 | Phase 1 | Complete |
-| STRU-03 | Phase 1 | Complete |
-| ENV-01 | Phase 2 | Pending |
-| ENV-02 | Phase 2 | Pending |
-| ENV-03 | Phase 2 | Pending |
-| EXEC-01 | Phase 2 | Pending |
-| EXEC-02 | Phase 2 | Pending |
-| PAR-01 | Phase 1 | Complete |
-| WORK-01 | Phase 3 | Pending |
-| WORK-02 | Phase 3 | Pending |
-| CI-01 | Phase 3 | Pending |
-| DOCS-01 | Phase 3 | Pending |
+| MONO-01 | TBD | Pending |
+| MONO-02 | TBD | Pending |
+| MONO-03 | TBD | Pending |
+| MONO-04 | TBD | Pending |
+| UI-01 | TBD | Pending |
+| UI-02 | TBD | Pending |
+| UI-03 | TBD | Pending |
+| DASH-01 | TBD | Pending |
+| DASH-02 | TBD | Pending |
+| DASH-03 | TBD | Pending |
+| DASH-04 | TBD | Pending |
+| DASH-05 | TBD | Pending |
 
 **Coverage:**
-- v1 requirements: 13 total
-- Mapped to phases: 13
-- Unmapped: 0 ✓
+- v1 requirements: 12 total
+- Mapped to phases: 0
+- Unmapped: 12 ⚠️
 
 ---
-*Requirements defined: 2026-04-11*
-*Last updated: 2026-04-11 after initial definition*
+*Requirements defined: 2026-04-12*
+*Last updated: 2026-04-12 after initialization*
