@@ -14,8 +14,8 @@
 
 ### UI Design & Integration
 
-- [ ] **UI-01**: Use the Stitch project "Forex Predictor Dashboard" for the design system
-- [ ] **UI-02**: Use "Forex Dashboard with SL/TP Controls" as the specific frontend template/screen
+- [x] **UI-01**: Use the Stitch project "Forex Predictor Dashboard" for the design system
+- [x] **UI-02**: Use "Forex Dashboard with SL/TP Controls" as the specific frontend template/screen
 - [x] **UI-03**: Integrate Context7 MCPs for documentation during development where necessary
 
 ### Dashboard Features
@@ -58,8 +58,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MONO-02 | Phase 1 | Complete |
 | MONO-03 | Phase 1 | Complete |
 | MONO-04 | Phase 1 | Complete |
-| UI-01 | Phase 2 | Pending |
-| UI-02 | Phase 2 | Pending |
+| UI-01 | Phase 2 | Complete |
+| UI-02 | Phase 2 | Complete |
 | UI-03 | Phase 1 | Complete |
 | DASH-01 | Phase 2 | Pending |
 | DASH-02 | Phase 2 | Pending |

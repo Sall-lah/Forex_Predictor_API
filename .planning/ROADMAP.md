@@ -30,7 +30,7 @@
   3. The current market price is distinctly displayed alongside the chart.
   4. A visual indicator accurately shows whether the backend/Kraken connection is healthy or failing.
 **Plans**: 2 plans
-- [ ] 02-01-PLAN.md — Scaffold UI baseline and Stitch layout
+- [x] 02-01-PLAN.md — Scaffold UI baseline and Stitch layout
 - [ ] 02-02-PLAN.md — Data polling hook and OHLCV chart implementation
 **UI hint**: yes
 
