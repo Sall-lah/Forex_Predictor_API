@@ -1,7 +1,12 @@
 import React from 'react';
 import { Chart } from './Chart';
+import { useMarketData } from '../hooks/useMarketData';
+import { HealthStatus } from './HealthStatus';
 
 export const Dashboard: React.FC = () => {
+    const { data, isHealthy, currentPrice } = useMarketData();
+    const latestData = data.length > 0 ? data[data.length - 1] : null;
+
     return (
         <main className="min-h-screen bg-surface flex flex-col">
 {/*  Top Bar  */}
@@ -15,12 +20,12 @@ export const Dashboard: React.FC = () => {
 <h1 className="font-headline font-black text-secondary tracking-widest text-base hidden md:block uppercase">KINETIC</h1>
 </div>
 <div className="flex items-center"><span className="font-headline font-black text-on-background text-lg tracking-tight uppercase">EUR / USD</span></div>
-<span className="bg-secondary/10 text-secondary text-[9px] px-1.5 py-0.5 rounded-full font-bold">LIVE</span>
+<HealthStatus isHealthy={isHealthy} />
 </div>
 <div className="flex space-x-6">
 <div className="flex flex-col">
 <span className="text-[9px] text-outline uppercase tracking-wider">Price</span>
-<span className="text-xs font-medium font-label">1.08424</span>
+<span className="text-xs font-medium font-label">{currentPrice?.toFixed(5) || 'Loading...'}</span>
 </div>
 <div className="flex flex-col">
 <span className="text-[9px] text-outline uppercase tracking-wider">Change</span>
@@ -70,28 +75,28 @@ export const Dashboard: React.FC = () => {
 </div>
 </div>
 <div className="relative h-[420px] w-full p-4">
-<Chart />
+<Chart data={data} />
 </div>
 <div className="px-6 py-4 bg-surface-container-high grid grid-cols-5 gap-4">
 <div className="flex flex-col">
 <span className="text-[9px] text-outline uppercase tracking-widest font-headline">Open</span>
-<span className="text-base font-label font-bold text-primary">1.08182</span>
+<span className="text-base font-label font-bold text-primary">{latestData?.open.toFixed(5) || '---'}</span>
 </div>
 <div className="flex flex-col">
 <span className="text-[9px] text-outline uppercase tracking-widest font-headline">High</span>
-<span className="text-base font-label font-bold text-secondary">1.08550</span>
+<span className="text-base font-label font-bold text-secondary">{latestData?.high.toFixed(5) || '---'}</span>
 </div>
 <div className="flex flex-col">
 <span className="text-[9px] text-outline uppercase tracking-widest font-headline">Low</span>
-<span className="text-base font-label font-bold text-tertiary">1.08110</span>
+<span className="text-base font-label font-bold text-tertiary">{latestData?.low.toFixed(5) || '---'}</span>
 </div>
 <div className="flex flex-col">
 <span className="text-[9px] text-outline uppercase tracking-widest font-headline">Close</span>
-<span className="text-base font-label font-bold text-primary">1.08424</span>
+<span className="text-base font-label font-bold text-primary">{latestData?.close.toFixed(5) || '---'}</span>
 </div>
 <div className="flex flex-col">
 <span className="text-[9px] text-outline uppercase tracking-widest font-headline">Volume</span>
-<span className="text-base font-label font-bold text-primary">42.8K</span>
+<span className="text-base font-label font-bold text-primary">{latestData ? (latestData.volume / 1000).toFixed(1) + 'K' : '---'}</span>
 </div>
 </div>
 </div>
