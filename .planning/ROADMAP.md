@@ -12,7 +12,7 @@ This roadmap delivers a safe monorepo migration in three coarse phases: first es
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: App Boundary Migration & Backend Parity** - Restructure into `api/` + `web/` placeholder while preserving API behavior.
+- [x] **Phase 1: App Boundary Migration & Backend Parity** - Restructure into `api/` + `web/` placeholder while preserving API behavior. (completed 2026-04-12)
 - [ ] **Phase 2: Runtime Isolation & Independent App Execution** - Make each app self-contained for env configuration and local startup.
 - [ ] **Phase 3: Monorepo Workflow, CI Scoping & Onboarding Docs** - Finalize root/scoped workflows and documentation for reliable day-to-day use.
 
@@ -59,6 +59,6 @@ Phases execute in numeric order: 1 → 1.1 → 2 → 2.1 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. App Boundary Migration & Backend Parity | 1/2 | In Progress | - |
+| 1. App Boundary Migration & Backend Parity | 2/2 | Complete   | 2026-04-12 |
 | 2. Runtime Isolation & Independent App Execution | 0/TBD | Not started | - |
 | 3. Monorepo Workflow, CI Scoping & Onboarding Docs | 0/TBD | Not started | - |

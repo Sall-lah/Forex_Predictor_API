@@ -11,7 +11,7 @@ Requirements for initial migration release. Each maps to exactly one roadmap pha
 
 - [x] **STRU-01**: Developer can see a repository layout with separate top-level application directories for backend and frontend (`api/` and `web/`).
 - [x] **STRU-02**: Existing backend service code, tests, and runtime assets are migrated into `api/` with clear app-local ownership.
-- [ ] **STRU-03**: Developer can start `web/` as a runnable placeholder app without frontend feature implementation.
+- [x] **STRU-03**: Developer can start `web/` as a runnable placeholder app without frontend feature implementation.
 
 ### Runtime and Environment Isolation
 
@@ -64,7 +64,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | STRU-01 | Phase 1 | Complete |
 | STRU-02 | Phase 1 | Complete |
-| STRU-03 | Phase 1 | Pending |
+| STRU-03 | Phase 1 | Complete |
 | ENV-01 | Phase 2 | Pending |
 | ENV-02 | Phase 2 | Pending |
 | ENV-03 | Phase 2 | Pending |
