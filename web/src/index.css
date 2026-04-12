@@ -1,80 +1,116 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-on-tertiary: #480015;
+  --color-background: #0e0e0e;
+  --color-on-surface-variant: #acabaa;
+  --color-error-dim: #bb5551;
+  --color-tertiary-fixed-dim: #e02057;
+  --color-secondary: #00FFC2;
+  --color-on-secondary-fixed: #004935;
+  --color-on-primary-container: #d0d0d0;
+  --color-secondary-container: #004432;
+  --color-inverse-on-surface: #565555;
+  --color-on-secondary: #005c44;
+  --color-outline: #767575;
+  --color-surface-variant: #252626;
+  --color-outline-variant: #484848;
+  --color-secondary-fixed: #36ffc4;
+  --color-on-error: #490106;
+  --color-surface-bright: #2c2c2c;
+  --color-on-background: #e7e5e4;
+  --color-on-primary-fixed: #3e4040;
+  --color-surface-container: #191a1a;
+  --color-on-tertiary-fixed-variant: #fffbff;
+  --color-on-secondary-fixed-variant: #00694e;
+  --color-inverse-primary: #5e5f60;
+  --color-error: #ee7d77;
+  --color-tertiary-dim: #e02057;
+  --color-surface-container-highest: #252626;
+  --color-on-tertiary-container: #000000;
+  --color-surface-container-lowest: #000000;
+  --color-primary-container: #454747;
+  --color-primary: #c6c6c7;
+  --color-secondary-dim: #00edb4;
+  --color-tertiary: #ff6e86;
+  --color-secondary-fixed-dim: #00f0b7;
+  --color-primary-fixed: #e2e2e2;
+  --color-on-primary-fixed-variant: #5a5c5c;
+  --color-surface-tint: #c6c6c7;
+  --color-on-tertiary-fixed: #ffffff;
+  --color-on-error-container: #ff9993;
+  --color-error-container: #7f2927;
+  --color-on-surface: #e7e5e4;
+  --color-surface: #0e0e0e;
+  --color-surface-container-high: #1f2020;
+  --color-tertiary-fixed: #f23063;
+  --color-primary-fixed-dim: #d4d4d4;
+  --color-inverse-surface: #fcf9f8;
+  --color-surface-dim: #0e0e0e;
+  --color-primary-dim: #b8b9b9;
+  --color-tertiary-container: #f23063;
+  --color-on-secondary-container: #00d9a4;
+  --color-on-primary: #3f4041;
+  --color-surface-container-low: #131313;
+
+  --font-headline: "Manrope", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-label: "Inter", sans-serif;
+}
 
 @layer base {
   body {
-    background-color: #000000;
-    color: #ffffff;
+    background-color: var(--color-background);
+    color: var(--color-on-background);
+    font-family: var(--font-body);
   }
 }
 
 @layer utilities {
-  .bg-surface-container {
-    background-color: #111827;
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+  
+  .kinetic-gradient {
+    background: linear-gradient(45deg, var(--color-primary), var(--color-primary-dim));
+  }
+  
+  .glass-panel {
+    background: rgba(37, 38, 38, 0.7);
+    backdrop-filter: blur(24px);
+  }
+  
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #0e0e0e;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #484848;
+  }
+  
+  .custom-toggle:checked ~ .toggle-dot {
+    transform: translateX(100%);
+    background-color: var(--color-secondary);
+  }
+  
+  .animate-pulse-ping {
+    animation: pulse-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
   }
 
-  .bg-surface-container-low {
-    background-color: #0f172a;
+  @keyframes pulse-ping {
+    75%, 100% {
+      transform: scale(2);
+      opacity: 0;
+    }
   }
 
-  .bg-surface-container-high {
-    background-color: #1f2937;
-  }
-
-  .bg-surface-container-highest {
-    background-color: #374151;
-  }
-
-  .text-on-background {
-    color: #f9fafb;
-  }
-
-  .text-primary {
-    color: #e5e7eb;
-  }
-
-  .text-outline {
-    color: #9ca3af;
-  }
-
-  .text-tertiary {
-    color: #f87171;
-  }
-
-  .text-on-tertiary {
-    color: #ffffff;
-  }
-
-  .bg-tertiary {
-    background-color: #f87171;
-  }
-
-  .bg-tertiary\/10 {
-    background-color: rgb(248 113 113 / 0.1);
-  }
-
-  .bg-tertiary\/5 {
-    background-color: rgb(248 113 113 / 0.05);
-  }
-
-  .border-tertiary\/20 {
-    border-color: rgb(248 113 113 / 0.2);
-  }
-
-  .hover\:bg-tertiary:hover {
-    background-color: #f87171;
-  }
-
-  .hover\:text-on-tertiary:hover {
-    color: #ffffff;
-  }
-
-  .hover\:bg-surface-container-high\/50:hover {
-    background-color: rgb(31 41 55 / 0.5);
-  }
-
-  .font-label {
-    font-family: Inter, sans-serif;
+  /* Hide TradingView Attribution */
+  #tv-attr-logo,
+  a[href*="tradingview.com"] {
+    display: none !important;
   }
 }

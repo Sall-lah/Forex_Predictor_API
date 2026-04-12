@@ -7,6 +7,9 @@ interface ChartProps {
     data: OHLCVData[];
 }
 
+/**
+ * Renders a lightweight candlestick chart with design system colors.
+ */
 export const Chart: React.FC<ChartProps> = ({ data }) => {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
@@ -24,11 +27,23 @@ export const Chart: React.FC<ChartProps> = ({ data }) => {
         const chart = createChart(chartContainerRef.current, {
             layout: {
                 background: { color: 'transparent' },
-                textColor: '#d1d5db',
+                textColor: '#767575', // outline
+                fontSize: 10,
+                fontFamily: 'Inter, sans-serif',
             },
             grid: {
-                vertLines: { color: '#1f2937' },
-                horzLines: { color: '#1f2937' },
+                vertLines: { color: 'rgba(72, 72, 72, 0.1)' }, // outline-variant at 10%
+                horzLines: { color: 'rgba(72, 72, 72, 0.1)' },
+            },
+            crosshair: {
+                vertLine: { color: '#c6c6c7', width: 1, style: 2 }, // primary
+                horzLine: { color: '#c6c6c7', width: 1, style: 2 },
+            },
+            rightPriceScale: {
+                borderColor: 'rgba(72, 72, 72, 0.1)',
+            },
+            timeScale: {
+                borderColor: 'rgba(72, 72, 72, 0.1)',
             },
             width: chartContainerRef.current.clientWidth,
             height: chartContainerRef.current.clientHeight,
@@ -37,11 +52,11 @@ export const Chart: React.FC<ChartProps> = ({ data }) => {
         chartRef.current = chart;
 
         const candlestickSeries = chart.addCandlestickSeries({
-            upColor: '#26a69a',
-            downColor: '#ef5350',
+            upColor: '#00fdc1', // secondary
+            downColor: '#ff6e86', // tertiary
             borderVisible: false,
-            wickUpColor: '#26a69a',
-            wickDownColor: '#ef5350',
+            wickUpColor: '#00fdc1',
+            wickDownColor: '#ff6e86',
         });
 
         seriesRef.current = candlestickSeries;
@@ -57,7 +72,6 @@ export const Chart: React.FC<ChartProps> = ({ data }) => {
     useEffect(() => {
         if (seriesRef.current && data.length > 0) {
             const formattedData: CandlestickData<Time>[] = data.map(item => {
-                // Ensure time is in seconds for lightweight-charts
                 let timeValue: Time;
                 if (typeof item.time === 'string') {
                     timeValue = Math.floor(new Date(item.time).getTime() / 1000) as Time;
@@ -75,15 +89,19 @@ export const Chart: React.FC<ChartProps> = ({ data }) => {
                     close: item.close,
                 };
             });
-            
-            // Sort by time
+
             formattedData.sort((a, b) => (a.time as number) - (b.time as number));
-            
-            seriesRef.current.setData(formattedData);
+
+            // Filter unique times to avoid lightweight-charts errors
+            const uniqueData = formattedData.filter((item, index, self) =>
+                index === self.findIndex((t) => t.time === item.time)
+            );
+
+            seriesRef.current.setData(uniqueData);
         }
     }, [data]);
 
     return (
-        <div ref={chartContainerRef} className="absolute inset-0 m-4 bg-[#0e0e0e] rounded overflow-hidden" />
+        <div ref={chartContainerRef} className="absolute inset-0 bg-[#0e0e0e]" />
     );
 };
