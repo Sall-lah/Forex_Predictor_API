@@ -6,7 +6,7 @@
 **Plans:** 1 plans
 
 Plans:
-- [ ] 01-api-updates-01-PLAN.md — Update API schemas, client, services, and routers for interval
+- [x] 01-api-updates-01-PLAN.md — Update API schemas, client, services, and routers for interval
 
 ## Phase 2: Express / Frontend Updates
 - **Task 2.1:** Pass the parameter in the Express proxy to the backend if needed.
