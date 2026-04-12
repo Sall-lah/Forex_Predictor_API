@@ -3,7 +3,7 @@
 ## Phases
 
 - [ ] **Phase 1: Foundation & Orchestration** - Unified monorepo setup with Express proxy and React scaffold
-- [ ] **Phase 2: UI Baseline & Data Visualization** - Stitch template integration and live market charting
+- [x] **Phase 2: UI Baseline & Data Visualization** - Stitch template integration and live market charting (completed 2026-04-12)
 - [ ] **Phase 3: Trading Controls & Prediction Integration** - ML prediction overlay and risk management inputs
 
 ## Phase Details
@@ -31,7 +31,7 @@
   4. A visual indicator accurately shows whether the backend/Kraken connection is healthy or failing.
 **Plans**: 2 plans
 - [x] 02-01-PLAN.md — Scaffold UI baseline and Stitch layout
-- [ ] 02-02-PLAN.md — Data polling hook and OHLCV chart implementation
+- [x] 02-02-PLAN.md — Data polling hook and OHLCV chart implementation
 **UI hint**: yes
 
 ### Phase 3: Trading Controls & Prediction Integration
@@ -50,5 +50,5 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Orchestration | 0/0 | Not started | - |
-| 2. UI Baseline & Data Visualization | 0/0 | Not started | - |
+| 2. UI Baseline & Data Visualization | 2/2 | Complete   | 2026-04-12 |
 | 3. Trading Controls & Prediction Integration | 0/0 | Not started | - |

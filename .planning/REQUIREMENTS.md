@@ -20,11 +20,11 @@
 
 ### Dashboard Features
 
-- [ ] **DASH-01**: Display Live Price Chart (OHLCV) using data from `/api/v1/historic-data/live`
-- [ ] **DASH-02**: Display Current Market Price clearly
+- [x] **DASH-01**: Display Live Price Chart (OHLCV) using data from `/api/v1/historic-data/live`
+- [x] **DASH-02**: Display Current Market Price clearly
 - [ ] **DASH-03**: Display Prediction Overlay / Status showing the LightGBM model's next prediction from `/api/v1/prediction/predict`
 - [ ] **DASH-04**: Provide manual input controls for Stop Loss (SL) and Take Profit (TP)
-- [ ] **DASH-05**: Display API Connectivity Status to show health of the backend/Kraken connection
+- [x] **DASH-05**: Display API Connectivity Status to show health of the backend/Kraken connection
 
 ## v2 Requirements
 
@@ -61,11 +61,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-01 | Phase 2 | Complete |
 | UI-02 | Phase 2 | Complete |
 | UI-03 | Phase 1 | Complete |
-| DASH-01 | Phase 2 | Pending |
-| DASH-02 | Phase 2 | Pending |
+| DASH-01 | Phase 2 | Complete |
+| DASH-02 | Phase 2 | Complete |
 | DASH-03 | Phase 3 | Pending |
 | DASH-04 | Phase 3 | Pending |
-| DASH-05 | Phase 2 | Pending |
+| DASH-05 | Phase 2 | Complete |
 
 **Coverage:**
 - v1 requirements: 12 total
