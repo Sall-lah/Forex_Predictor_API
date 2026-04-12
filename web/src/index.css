@@ -4,6 +4,77 @@
 
 @layer base {
   body {
-    @apply bg-surface text-white;
+    background-color: #000000;
+    color: #ffffff;
+  }
+}
+
+@layer utilities {
+  .bg-surface-container {
+    background-color: #111827;
+  }
+
+  .bg-surface-container-low {
+    background-color: #0f172a;
+  }
+
+  .bg-surface-container-high {
+    background-color: #1f2937;
+  }
+
+  .bg-surface-container-highest {
+    background-color: #374151;
+  }
+
+  .text-on-background {
+    color: #f9fafb;
+  }
+
+  .text-primary {
+    color: #e5e7eb;
+  }
+
+  .text-outline {
+    color: #9ca3af;
+  }
+
+  .text-tertiary {
+    color: #f87171;
+  }
+
+  .text-on-tertiary {
+    color: #ffffff;
+  }
+
+  .bg-tertiary {
+    background-color: #f87171;
+  }
+
+  .bg-tertiary\/10 {
+    background-color: rgb(248 113 113 / 0.1);
+  }
+
+  .bg-tertiary\/5 {
+    background-color: rgb(248 113 113 / 0.05);
+  }
+
+  .border-tertiary\/20 {
+    border-color: rgb(248 113 113 / 0.2);
+  }
+
+  .hover\:bg-tertiary:hover {
+    background-color: #f87171;
+  }
+
+  .hover\:text-on-tertiary:hover {
+    color: #ffffff;
+  }
+
+  .hover\:bg-surface-container-high\/50:hover {
+    background-color: rgb(31 41 55 / 0.5);
+  }
+
+  .font-label {
+    font-family: Inter, sans-serif;
   }
 }
