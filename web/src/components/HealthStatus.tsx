@@ -20,7 +20,7 @@ export const HealthStatus: React.FC<HealthStatusProps> = ({ isHealthy }) => {
             </span>
             <div className="absolute left-0 mt-2 w-48 p-2 bg-surface-container-high border border-outline-variant/20 rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 pointer-events-none">
                 <p className="text-[10px] text-on-background font-label">
-                    Backend or Kraken connection lost. Reconnecting...
+                    Backend or Kraken connection lost. Reconnecting and serving stale chart data.
                 </p>
             </div>
         </div>

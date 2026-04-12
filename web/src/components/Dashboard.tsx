@@ -76,6 +76,19 @@ export const Dashboard: React.FC = () => {
 </div>
 <div className="relative h-[420px] w-full p-4">
 <Chart data={data} />
+{!isHealthy && (
+<div className="absolute inset-x-4 top-4 z-20">
+<div className="bg-tertiary/10 border border-tertiary/20 rounded-md px-3 py-2 backdrop-blur-sm">
+<div className="flex items-start gap-2">
+<span className="material-symbols-outlined text-tertiary text-sm" data-icon="warning">warning</span>
+<div className="flex flex-col">
+<span className="text-[10px] font-bold uppercase tracking-wider text-tertiary">Stale market data</span>
+<span className="text-[10px] text-on-background font-label">Connection lost. Reconnecting automatically while keeping the latest chart visible.</span>
+</div>
+</div>
+</div>
+</div>
+)}
 </div>
 <div className="px-6 py-4 bg-surface-container-high grid grid-cols-5 gap-4">
 <div className="flex flex-col">
