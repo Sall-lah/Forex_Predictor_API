@@ -30,12 +30,20 @@ export const useMarketData = () => {
                 if (!isMounted) return;
 
                 // Standardizing response payload assumption
-                const records = Array.isArray(result) ? result : (result.data || []);
+                const rawRecords = Array.isArray(result) ? result : (result.data || []);
+                const mappedRecords = rawRecords.map((record: any) => ({
+                    time: record.timestamp || record.time,
+                    open: record.open,
+                    high: record.high,
+                    low: record.low,
+                    close: record.close,
+                    volume: record.volume
+                }));
                 
-                setData(records);
+                setData(mappedRecords);
                 
-                if (records.length > 0) {
-                    const latest = records[records.length - 1];
+                if (mappedRecords.length > 0) {
+                    const latest = mappedRecords[mappedRecords.length - 1];
                     setCurrentPrice(latest.close);
                 }
                 
