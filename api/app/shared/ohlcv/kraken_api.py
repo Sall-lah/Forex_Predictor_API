@@ -23,18 +23,25 @@ class KrakenAPIClient:
         self.base_url = base_url or settings.KRAKEN_OHLC_URL
         self.timeout = timeout or settings.KRAKEN_TIMEOUT
 
-    def fetch_ohlcv_data(self, pair: str, hours: int) -> dict:
-        """Fetch raw OHLCV payload from Kraken for a pair/time window."""
-        query_params = self._build_query_params(pair=pair, hours=hours)
+    def fetch_ohlcv_data(
+        self, pair: str, hours: int, interval: int | None = None
+    ) -> dict:
+        """Fetch raw OHLCV payload from Kraken for a pair/time window and optional interval."""
+        interval = interval or settings.KRAKEN_HOURLY_INTERVAL
+        query_params = self._build_query_params(
+            pair=pair, hours=hours, interval=interval
+        )
         payload = self._request_payload(pair=pair, query_params=query_params)
         self._validate_api_response(payload=payload, pair=pair)
         return payload
 
-    def _build_query_params(self, pair: str, hours: int) -> dict[str, int | str]:
+    def _build_query_params(
+        self, pair: str, hours: int, interval: int
+    ) -> dict[str, int | str]:
         """Build Kraken OHLC query parameters for pair and time range."""
         return {
             "pair": pair,
-            "interval": settings.KRAKEN_HOURLY_INTERVAL,
+            "interval": interval,
             "since": self._calculate_since_timestamp(hours),
         }
 

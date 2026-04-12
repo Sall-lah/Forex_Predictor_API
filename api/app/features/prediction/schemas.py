@@ -29,6 +29,10 @@ class PredictionRequest(BaseModel):
         description="Asset name for model feature encoding (BTCUSD or ETHUSD)",
         examples=["BTCUSD", "ETHUSD"],
     )
+    interval: Literal[1, 5, 15, 30, 60, 240, 1440, 10080, 21600] = Field(
+        60,
+        description="Time frame interval in minutes",
+    )
 
 
 class PredictionResponse(BaseModel):
