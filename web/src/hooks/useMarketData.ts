@@ -9,7 +9,7 @@ export interface OHLCVData {
     volume: number;
 }
 
-export const useMarketData = (pair: string = 'BTC/USD') => {
+export const useMarketData = (pair: string = 'BTC/USD', intervalMinutes: number = 60) => {
     const [data, setData] = useState<OHLCVData[]>([]);
     const [error, setError] = useState<Error | null>(null);
     const [isHealthy, setIsHealthy] = useState<boolean>(true);
@@ -21,7 +21,7 @@ export const useMarketData = (pair: string = 'BTC/USD') => {
         const fetchData = async () => {
             try {
                 // Vite proxy should route this to backend
-                const response = await fetch('/api/v1/historic-data/live?pair=' + encodeURIComponent(pair));
+                const response = await fetch(`/api/v1/historic-data/live?pair=${encodeURIComponent(pair)}&interval=${intervalMinutes}`);
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -65,7 +65,7 @@ export const useMarketData = (pair: string = 'BTC/USD') => {
             isMounted = false;
             clearInterval(interval);
         };
-    }, [pair]);
+    }, [pair, intervalMinutes]);
 
     return { data, error, isHealthy, currentPrice };
 };

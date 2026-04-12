@@ -20,7 +20,7 @@ client = TestClient(app)
 class MockHistoricDataService:
     """Mock service returning predictable OHLCV data for testing."""
 
-    def fetch_hourly_ohlcv(self, pair: str) -> HistoricDataResponse:
+    def fetch_hourly_ohlcv(self, pair: str, interval: int = 60) -> HistoricDataResponse:
         """Return mock OHLCV data."""
         record = OHLCVRecord(
             timestamp=datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc),
