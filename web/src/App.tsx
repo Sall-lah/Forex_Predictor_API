@@ -1,8 +1,8 @@
+import { Dashboard } from './components/Dashboard';
+
 function App() {
   return (
-    <div>
-      <h1>Forex Dashboard</h1>
-    </div>
+    <Dashboard />
   );
 }
 
