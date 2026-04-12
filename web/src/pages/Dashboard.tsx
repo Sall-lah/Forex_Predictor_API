@@ -1,7 +1,7 @@
 import React from 'react';
-import { Chart } from './Chart';
+import { Chart } from '../components/Chart';
 import { useMarketData } from '../hooks/useMarketData';
-import { HealthStatus } from './HealthStatus';
+import { HealthStatus } from '../components/HealthStatus';
 
 export const Dashboard: React.FC = () => {
     const { data, isHealthy, currentPrice } = useMarketData();

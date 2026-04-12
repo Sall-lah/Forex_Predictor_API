@@ -59,7 +59,7 @@ export const useMarketData = (pair: string = 'BTC/USD') => {
         };
 
         fetchData();
-        const interval = setInterval(fetchData, 2000); // 2 second polling
+        const interval = setInterval(fetchData, 15000); // 15 second polling
 
         return () => {
             isMounted = false;
