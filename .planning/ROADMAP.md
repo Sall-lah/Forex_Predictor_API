@@ -16,7 +16,9 @@
   1. Running a single command from the project root starts both the FastAPI backend and Express web server.
   2. Stopping the runner cleanly terminates both processes without leaving zombie instances.
   3. The React app is accessible in the browser and successfully routes API requests to the backend via the Express proxy.
-**Plans**: TBD
+**Plans**: 2 plans
+- [ ] 01-01-PLAN.md — Scaffold React app and Express BFF
+- [ ] 01-02-PLAN.md — Root Orchestration Setup
 
 ### Phase 2: UI Baseline & Data Visualization
 **Goal**: Users can view a styled dashboard displaying live market data and backend connectivity.
