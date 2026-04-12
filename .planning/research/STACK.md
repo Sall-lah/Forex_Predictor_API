@@ -1,102 +1,79 @@
-# Stack Research
+# Technology Stack
 
-**Domain:** Python FastAPI API + frontend placeholder monorepo
-**Researched:** 2026-04-11
-**Confidence:** HIGH
+**Project:** Forex Predictor API Monorepo Restructure
+**Researched:** Sun Apr 12 2026
+**Overall confidence:** HIGH
 
 ## Recommended Stack
 
-### Core Technologies
+### Core Frameworks
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| React | 19.x | Frontend UI | The modern standard for React development. Delivers robust concurrent rendering and improved hooks out of the box. |
+| Vite | 6.x | Frontend Build Tooling | Replaces Webpack/CRA. Provides extremely fast HMR (Hot Module Replacement) and optimized production builds. |
+| Express | 5.x | Frontend Server / API Gateway (BFF) | The standard Node web framework. Version 5 brings native Promise support for cleaner async route handlers. Serves the React app and proxies/orchestrates calls to the Python API. |
+| FastAPI | (Existing) | Backend ML Engine | Preserved as-is from the current application. Excellent performance for Python ML inference. |
 
-| Technology | Version | Purpose | Why Recommended |
-|------------|---------|---------|-----------------|
-| FastAPI | 0.135.3 | Backend HTTP API framework in `api/` | Current FastAPI standard for typed Python APIs; strong OpenAPI support and clean migration from existing codebase. |
-| uv | 0.11.6 | Python package/project manager for `api/` | 2025+ standardizing quickly: lockfile-based reproducibility, fast installs, and native workspace support for monorepo-style Python management. |
-| pnpm | 10.33.0 | JS package manager + workspace root orchestration | De-facto monorepo package manager pattern for JS/TS side; strict dependency boundaries and single workspace lockfile behavior. |
-| Turborepo (`turbo`) | 2.9.6 | Cross-app task orchestration (`api` + `web`) | Standard monorepo task runner pattern for caching/parallel runs; gives independent app commands plus unified root workflows. |
-| Vite | 8.0.8 | `web/` placeholder app runtime/build tool | Fastest low-friction placeholder scaffold for independent frontend execution; easy to keep minimal until real web implementation starts. |
+### Monorepo & Concurrency
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| concurrently | 9.x | Unified Startup Script | The simplest and most reliable way to run multiple processes (Node Express + Python Uvicorn) from a single root `npm start` command. Streamlines developer experience without complex infrastructure. |
+| npm workspaces | v10+ | Dependency Management | Built into modern NPM. Cleanly separates the `web/` dependencies from the root orchestration without needing extra tools like Lerna. |
 
-### Supporting Libraries
-
+### API Communication
 | Library | Version | Purpose | When to Use |
 |---------|---------|---------|-------------|
-| Pydantic | 2.12.5 | API schema validation/model typing | Always in FastAPI app contracts and settings models. |
-| pydantic-settings | 2.13.1 | App-local env/config loading | Always for per-app env isolation (`api/.env`), with explicit config pathing after migration. |
-| Uvicorn | 0.44.0 | ASGI runtime process | Always for dev/prod app serving (`uv run fastapi dev` locally, `fastapi run`/`uvicorn` in containers). |
-| Ruff | 0.15.10 | Lint + formatting | Use as default Python quality gate; replaces multi-tool lint stacks for faster CI and simpler config. |
-| Pytest | 9.0.3 | Backend test runner | Keep existing test strategy; run package-scoped from `api/`. |
-
-### Development Tools
-
-| Tool | Purpose | Notes |
-|------|---------|-------|
-| Node.js | 20.19+ LTS | Runtime for `web/`, pnpm, turbo | Required by modern Vite 8 line; pin in repo docs/CI to avoid local mismatch. |
-| Corepack | Package manager pinning | Enable and pin pnpm version at repo root for deterministic onboarding. |
-| Docker | Deployment/runtime packaging | Build FastAPI image from official Python base; do not use deprecated FastAPI base images. |
-
-## Installation
-
-```bash
-# Root (JS workspace orchestration)
-corepack enable
-corepack prepare pnpm@10.33.0 --activate
-pnpm add -D turbo@2.9.6
-
-# Web placeholder app
-pnpm create vite web --template react-ts
-
-# API (inside api/)
-uv init --app
-uv add fastapi==0.135.3 pydantic==2.12.5 pydantic-settings==2.13.1 uvicorn==0.44.0 httpx==0.28.1
-uv add --dev ruff==0.15.10 pytest==9.0.3
-uv lock
-```
+| Native Fetch | Built-in | Client-to-BFF | The 2026 standard for making HTTP requests from React. No need for heavy external libraries like Axios. |
+| http-proxy-middleware | 3.x | Express-to-FastAPI Proxy | Use in Express to seamlessly proxy frontend API requests (`/api/*`) to the FastAPI backend running on a different port. Avoids CORS issues and provides a single origin. |
 
 ## Alternatives Considered
 
-| Recommended | Alternative | When to Use Alternative |
-|-------------|-------------|-------------------------|
-| pnpm workspaces | npm workspaces | Only if team policy forbids pnpm; otherwise pnpm is better for strictness/perf in monorepos. |
-| Turborepo | Nx | Choose Nx if you need graph visualization/generators/policies at enterprise scale from day one. |
-| Vite placeholder | Next.js app scaffold | Choose Next.js only if you already know the web app will need SSR/full-stack React immediately. |
-| uv | Poetry | Choose Poetry if org-standard tooling is already Poetry and migration cost outweighs uv benefits. |
+| Category | Recommended | Alternative | Why Not |
+|----------|-------------|-------------|---------|
+| Monorepo Runner | `concurrently` | `Turborepo` / `Nx` | While powerful, they are overkill for a simple two-app (Node + Python) repository. They excel in multi-package Node ecosystems but add unnecessary configuration overhead for a simple start script. |
+| Monorepo Runner | `concurrently` | `docker-compose` | Heavyweight for local rapid UI iteration. Better suited for production deployments, but `concurrently` offers a faster inner dev loop for the UI. |
+| Frontend Server | Express 5 | Next.js | User explicitly requested React + Express. Next.js would combine these but changes the architectural requirement. Express acts perfectly as a lightweight Backend-For-Frontend (BFF). |
 
-## What NOT to Use
+## Installation & Setup
 
-| Avoid | Why | Use Instead |
-|-------|-----|-------------|
-| Root-level shared `.env` for both apps | Causes config leakage and accidental cross-app coupling | App-local env files (`api/.env`, `web/.env`) with separate loaders. |
-| Deprecated `tiangolo/uvicorn-gunicorn-fastapi` Docker base image | Official FastAPI docs mark it deprecated; unnecessary complexity now that `fastapi`/`uvicorn` support workers directly | Build from `python` base image and run `fastapi run`/`uvicorn` explicitly. |
-| Conda + pip dual source of truth for app dependencies | Drift-prone, hard to reproduce in CI/containers | `pyproject.toml` + `uv.lock` as single Python dependency source. |
+### Root Orchestration (`/package.json`)
+```json
+{
+  "name": "forex-predictor-monorepo",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install --prefix web && conda env update -f api/environment.yml",
+    "dev:api": "cd api && uvicorn app.main:app --reload --port 8000",
+    "dev:web": "npm run dev --prefix web",
+    "dev": "concurrently -c \"cyan,magenta\" -n \"API,WEB\" \"npm run dev:api\" \"npm run dev:web\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
+```
 
-## Stack Patterns by Variant
+### Express Server (`/web/package.json`)
+```bash
+npm install express http-proxy-middleware
+npm install -D typescript @types/express ts-node
+```
 
-**If this milestone remains “backend migration + web placeholder”:**
-- Use React + Vite only as a thin independently runnable shell (`web/`).
-- Because it minimizes frontend commitment while proving monorepo boundaries now.
+### React App (`/web/client/package.json`)
+```bash
+npm create vite@latest client -- --template react-ts
+```
 
-**If frontend later needs SSR/server rendering:**
-- Keep monorepo shape, swap `web/` to Next.js or React Router framework mode.
-- Because `api/` stays independently deployable, and frontend can evolve without redoing API packaging.
+## Anti-Patterns to Avoid
 
-## Version Compatibility
-
-| Package A | Compatible With | Notes |
-|-----------|-----------------|-------|
-| Vite 8.0.8 | Node.js ^20.19.0 \|\| >=22.12.0 | Pin Node 20.19+ in local + CI immediately. |
-| FastAPI 0.135.3 | Pydantic 2.x | Current FastAPI ecosystem standard is Pydantic v2-based. |
-| uv 0.11.6 | `pyproject.toml` + `uv.lock` | Use `uv sync`/`uv run --frozen` in CI for reproducibility. |
-| pnpm 10.33.0 | Workspace root `pnpm-workspace.yaml` | Supports single shared lockfile and explicit workspace protocol behavior. |
+| Anti-Feature | Why Avoid | What to Do Instead |
+|--------------|-----------|-------------------|
+| Enabling CORS on FastAPI | Exposes the Python backend to direct browser access, bypassing the Express layer. | Use Express as a reverse proxy (`http-proxy-middleware`). The React app talks only to Express on the same origin, and Express talks to FastAPI on the internal network. |
+| `create-react-app` | Deprecated and unmaintained. Slow build times. | Use Vite for scaffolding the React application. |
+| Python Subprocess in Node | Using Node's `child_process.spawn` inside Express to run FastAPI creates tight coupling and zombie processes. | Keep processes separate and use a dedicated runner like `concurrently` at the repository root. |
 
 ## Sources
-
-- Context7 `/astral-sh/uv` — workspace support, lock/sync behavior, FastAPI integration guidance (HIGH)
-- Context7 `/fastapi/fastapi` — Docker deployment guidance, workers, deprecated base image warning (HIGH)
-- Context7 `/websites/pnpm_io` — workspace settings, shared lockfile, `workspace:` protocol (HIGH)
-- PyPI JSON API: `fastapi`, `pydantic`, `pydantic-settings`, `uvicorn`, `uv`, `ruff`, `pytest`, `httpx` — current versions (MEDIUM)
-- npm registry `latest`: `pnpm`, `turbo`, `vite`, `react`, `typescript` — current versions (MEDIUM)
-- Official docs: https://vite.dev/guide/ (Node compatibility + monorepo suitability), https://react.dev/learn/start-a-new-react-project, https://pnpm.io/workspaces (MEDIUM)
-
----
-*Stack research for: Forex Predictor API monorepo restructure*
-*Researched: 2026-04-11*
+- Official Express 5.0 Release Documentation
+- Vite 6 Documentation
+- React 19 Upgrade Guide
+- Concurrently GitHub Repository (Standard Monorepo Practices)

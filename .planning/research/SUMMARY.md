@@ -1,155 +1,139 @@
 # Project Research Summary
 
-**Project:** Forex Predictor API
-**Domain:** FastAPI backend migration to `apps/api` + placeholder `apps/web` monorepo
-**Researched:** 2026-04-11
+**Project:** Forex Predictor API Monorepo Restructure
+**Domain:** React/Express + Python FastAPI Monorepo (Forex Trading Dashboard)
+**Researched:** 2026-04-12
 **Confidence:** HIGH
 
 ## Executive Summary
 
-This project is a backend-first product (live FX data + prediction API) undergoing a structural migration to a monorepo layout with independent `api` and `web` app boundaries. The research is consistent across stack, features, architecture, and pitfalls: experts treat this as a **move-for-isolation and operability**, not a rewrite. The recommended implementation is to preserve backend behavior first, keep web intentionally minimal, and only then add orchestration enhancements.
+The Forex Predictor API Monorepo Restructure is a technical effort to build a React-based trading dashboard alongside an existing Python FastAPI backend. The established industry standard for this type of application is the Backend-For-Frontend (BFF) pattern, where an Express.js server hosts the React static assets and acts as a reverse proxy to the Python machine learning API. This avoids complex cross-origin (CORS) security issues and allows clean separation of concerns.
 
-The strongest approach is: move current FastAPI code into `apps/api` with parity tests, enforce app-local env ownership (`apps/api/.env`, `apps/web/.env.local`), and establish canonical per-app run/test commands before introducing optional tooling complexity. Stack guidance points to modern reproducible tooling (uv + lockfile for Python, pnpm + optional turbo for workspace orchestration), while architecture guidance emphasizes app-owned runtime boundaries and explicit contract-based integration (web talks to API over HTTP only).
+The recommended approach leverages React 19 powered by Vite, Express 5 as the BFF, and the existing FastAPI application. Orchestration will be handled via a unified `concurrently` start script using npm workspaces to streamline the local developer experience without the overhead of heavy monorepo tools like Turborepo. Core features to focus on include live OHLCV candlestick charts, prediction overlays, and Stop Loss/Take Profit (SL/TP) controls, purposefully avoiding direct trade execution to minimize scope and liability.
 
-Primary risks are operational, not algorithmic: import/path drift after folder moves, environment leakage across app boundaries, and CI silently running stale paths or partial tests. Mitigation is phase-gated migration with parity checks, explicit working directories, test collection assertions, and strict anti-scope rules (no full web build in this milestone).
+The most critical risks to mitigate during implementation are process management failures (zombie Uvicorn processes when stopping the Node runner) and cross-origin resource sharing (CORS) nightmares caused by the React app directly calling the Python backend. Proper reverse proxying and robust exit signal handling in the root startup script are essential early-phase requirements.
 
 ## Key Findings
 
 ### Recommended Stack
 
-Research converges on keeping the current Python/FastAPI core and modernizing package/task management around monorepo boundaries. The key requirement is reproducibility and independent runtime ownership per app, not introducing novel infrastructure.
+The chosen stack prioritizes a lightweight, high-performance developer experience while preserving the existing backend as-is. We opted for a simple unified runner instead of complex monorepo infrastructure, recognizing the explicit 2-app boundary constraint.
 
 **Core technologies:**
-- **FastAPI 0.135.3 + Pydantic 2.12.5:** API contracts and validation — aligns with current ecosystem standard and existing code shape.
-- **uv 0.11.6:** Python dependency/project management — single-source lockfile workflow (`pyproject.toml` + `uv.lock`) reduces drift.
-- **pnpm 10.33.0:** workspace package management — strict dependency boundaries and reliable root orchestration.
-- **Turborepo 2.9.6 (optional early, useful soon):** filtered, cacheable cross-app task execution — improves CI/local speed as repo grows.
-- **Vite 8.0.8 (web placeholder):** minimal independently runnable frontend shell without committing to full frontend scope.
-
-**Critical version requirements:**
-- Node.js **20.19+** for Vite 8 compatibility.
-- FastAPI version line compatible with Pydantic v2.
-- Use locked Python dependency workflow (`uv lock`, frozen CI installs).
+- **React 19 & Vite 6:** Frontend UI & Build Tooling — The modern standard for high-performance React applications.
+- **Express 5:** Web Server & BFF — Acts as the single origin for the React app and proxies `/api` calls to FastAPI, avoiding CORS issues entirely.
+- **FastAPI (Existing):** Backend ML Engine — Preserved as the existing core inference and data-fetching engine.
+- **concurrently 9 & npm workspaces:** Monorepo Orchestration — Provides a unified `npm run dev` startup experience for both Node and Python environments.
+- **http-proxy-middleware:** API Proxying — Enables seamless routing from Express to the FastAPI process.
 
 ### Expected Features
 
-Feature research is clear: v1 is about safe monorepo operability and zero regression in API behavior.
+The feature set is highly constrained to analysis and prediction, intentionally excluding wallet management or trade execution.
 
 **Must have (table stakes):**
-- Independent `api` and `web` execution paths.
-- App-local environment config and validation.
-- Backend behavior parity after relocation.
-- Root command surface with scoped task execution.
-- CI scoping so API and web checks run independently.
-- Migration/onboarding docs that reflect new paths and commands.
+- **Live Price Chart (OHLCV)** — Visualizing historical and live price action is essential.
+- **Current Market Price Display** — Instant visibility into the current pricing.
+- **Prediction Overlay / Status** — The core value prop; displaying the LightGBM model's next prediction.
+- **Stop Loss (SL) & Take Profit (TP) Inputs** — Standard text/number inputs for risk management calculations.
+- **API Connectivity Status** — Indicator showing if the backend/Kraken connection is healthy.
 
 **Should have (competitive):**
-- Graph-aware affected execution.
-- Remote task cache.
-- Contract-first API artifact flow for future web consumption.
-- Optional one-command full-stack dev profile.
+- **Visual SL/TP Dragging on Chart** — Draggable lines for setting risk parameters directly on the chart.
+- **Prediction Confidence Gauge** — Visualizing the model's certainty.
+- **Backtest Simulation Overlay** — Showing historic prediction performance.
 
 **Defer (v2+):**
-- Generators/scaffolding for future packages.
-- Rich API-to-web typed SDK automation pipeline.
-- Any non-placeholder web product implementation.
+- Dynamic SL/TP recommendations based on volatility.
+- Multi-exchange support or social trading features.
 
 ### Architecture Approach
 
-Architecture guidance recommends a strict app boundary model under `apps/`: `apps/api` owns backend runtime/deps/tests/config; `apps/web` owns frontend runtime/config; repo root only orchestrates tasks and docs. Communication is explicit over HTTP contracts (no cross-app imports, no shared runtime env files). Migration order should be “move-as-is, validate parity, isolate config, then optimize orchestration and harden contracts.”
+The architecture is built around a Backend-For-Frontend (BFF) pattern within a monorepo to maintain strong runtime isolation while enabling a unified development experience.
 
 **Major components:**
-1. **`apps/api`** — existing FastAPI layered backend + tests + model artifact configuration.
-2. **`apps/web`** — minimal placeholder app with independent run and env contract.
-3. **Repo root orchestration** — workspace commands, optional turbo pipelines, CI entrypoints, migration docs.
-4. **Cross-app contract layer** — explicit base URL/CORS/env contract (public values only).
+1. **React UI (`/web/client`)** — Renders the trading dashboard and captures user inputs.
+2. **Express Server (`/web/server`)** — Serves React static assets, manages frontend configuration, and proxies `/api/*` traffic.
+3. **FastAPI Backend (`/api`)** — Handles OHLCV data fetching, ML inference, and external integrations (Kraken).
 
 ### Critical Pitfalls
 
-1. **Import/path drift after move** — prevent with canonical `api` root command contract and parity smoke runs from both root and app context.
-2. **Cross-app env leakage** — prevent with app-local env files only and explicit precedence validation.
-3. **CI old-path assumptions** — prevent with explicit job working directories, split app jobs, and temporary stale-path checks.
-4. **Pytest discovery drift** — prevent with pinned invocation paths/config and collected-test-count guardrails.
-5. **Command sprawl** — prevent with one canonical command set per app (dev/test/run) reused in docs + CI.
+1. **Zombie Backend Processes** — Avoided by using robust process managers (`honcho`/`foreman`) or explicitly handling SIGINT/SIGTERM in the Node runner to kill the Python child process.
+2. **Cross-Origin Cookie & CORS Nightmares** — Avoided by strictly routing all UI API requests through the Express proxy rather than directly to FastAPI.
+3. **Timezone & Timestamp Mismatches** — Avoided by standardizing all timestamps as Unix milliseconds before sending them to the React charting library.
+4. **Over-fetching Live Data** — Avoided by aligning the React polling interval with the underlying OHLCV candle timeframe (e.g., polling every 1 minute for 1m candles).
 
 ## Implications for Roadmap
 
-Based on combined research, suggested phase structure:
+Based on research, suggested phase structure:
 
-### Phase 1: Boundary Migration + Parity Lock
-**Rationale:** Highest dependency and risk concentration; everything else depends on stable app boundaries.
-**Delivers:** `apps/api` + `apps/web` structure, backend relocated with unchanged API behavior, placeholder web runnable.
-**Addresses:** Independent app execution, backend parity, anti-feature guardrail against full web scope.
-**Avoids:** Import/path drift, hidden shared-state coupling, over-scaffolding web.
+### Phase 1: Monorepo Foundation & Orchestration
+**Rationale:** The unified startup script and environment isolation are the biggest architectural risks. Building this first ensures developers don't suffer from zombie processes or env bleed.
+**Delivers:** The root monorepo setup (`package.json`), `concurrently` runner script, and strict `.env` boundary rules.
+**Addresses:** API Connectivity Status, Python environment setup.
+**Avoids:** Zombie Backend Processes, Python Environment Activation Failures, Environment Variable Bleeding.
 
-### Phase 2: Runtime Contract + Env Isolation
-**Rationale:** Independent operation is unreliable without strict config ownership and canonical commands.
-**Delivers:** Per-app env contracts (`.env.example`), startup validation, canonical dev/test/run commands per app.
-**Addresses:** App-local env config, root command ergonomics, onboarding clarity.
-**Avoids:** Cross-app env leakage, command sprawl, “works only from folder X” failures.
+### Phase 2: Express BFF & Reverse Proxy
+**Rationale:** Creating the API Gateway before the frontend prevents CORS issues from ever occurring.
+**Delivers:** The `/web/server` Express application configured with `http-proxy-middleware` pointing to the FastAPI backend.
+**Uses:** Express 5, `http-proxy-middleware`.
+**Implements:** The Backend-For-Frontend proxy layer.
+**Avoids:** Cross-Origin Cookie & CORS Nightmares.
 
-### Phase 3: CI/Task Orchestration Split
-**Rationale:** Once local parity is stable, CI must mirror app boundaries to prevent false greens/reds.
-**Delivers:** API/web split CI jobs, explicit working directories, scoped task execution (`--filter` / app-targeted commands), test count assertions.
-**Addresses:** CI path scoping table-stake, scoped execution requirement.
-**Avoids:** Stale root assumptions, skipped tests, pytest rootdir drift.
+### Phase 3: Frontend Scaffold & Charting
+**Rationale:** The chart is the centerpiece of the dashboard and a prerequisite for all other visual features.
+**Delivers:** Vite React app setup (`/web/client`), basic dashboard layout, and the Live Price Chart (OHLCV).
+**Uses:** React 19, Vite 6.
+**Addresses:** Live Price Chart (OHLCV), Current Market Price Display.
+**Avoids:** Timezone & Timestamp Mismatches, Over-fetching Live Data.
 
-### Phase 4: Contract Hardening + Scaling Enhancements
-**Rationale:** Add leverage only after correctness and operability are established.
-**Delivers:** API↔web contract hardening (base URL/CORS/OpenAPI artifact), optional graph-aware affected runs, optional remote caching.
-**Uses:** Turborepo/pnpm capabilities and architecture contract patterns.
-**Implements:** Differentiators without destabilizing baseline migration.
+### Phase 4: Prediction & Risk Controls Integration
+**Rationale:** Adds the ML core value proposition on top of the established charting baseline.
+**Delivers:** ML prediction overlay on the chart, basic SL/TP text inputs, and connectivity indicators.
+**Addresses:** Prediction Overlay / Status, Stop Loss & Take Profit Inputs.
+**Avoids:** Duplicating Business Logic (by relying entirely on the FastAPI backend for calculations).
 
 ### Phase Ordering Rationale
 
-- Structural correctness before tooling optimization minimizes regression blast radius.
-- Architecture boundaries (app-owned runtime/config) map directly to phase boundaries.
-- Pitfall-heavy items (imports/env/CI/test discovery) are front-loaded to reduce downstream rework.
+- **Infrastructure First:** By solving process management (Phase 1) and CORS/Proxying (Phase 2) first, we eliminate the most frustrating friction points for local UI development.
+- **UI Dependency Chain:** The React chart (Phase 3) must be built before predictions or SL/TP controls (Phase 4) can be visualized on it.
+- **Risk Mitigation:** Isolating the environments early guarantees the existing, stable FastAPI application is protected from accidental regressions.
 
 ### Research Flags
 
 Phases likely needing deeper research during planning:
-- **Phase 3:** choose and calibrate orchestration strategy (plain pnpm filters vs turbo pipelines vs later Nx-style affected).
-- **Phase 4:** API contract artifact strategy (OpenAPI generation/validation flow and when to introduce typed client generation).
-- **Deployment hardening work in/after Phase 4:** container/runtime env precedence behavior across environments.
+- **Phase 3:** Needs research on the specific React charting library to use (e.g., Lightweight Charts vs. Recharts) to handle OHLCV financial data effectively.
+- **Phase 4:** SL/TP state synchronization between chart overlays and text inputs often introduces complex state management needs.
 
-Phases with standard patterns (likely skip `/gsd-research-phase`):
-- **Phase 1:** folder migration + parity workflow is well-documented and already tightly specified.
-- **Phase 2:** app-local env ownership and canonical command contracts are mature, standard practices.
+Phases with standard patterns (skip research-phase):
+- **Phase 1 & 2:** Express proxying and `concurrently` runners are well-documented, standard patterns.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Strong primary sources (Context7 + official docs) with explicit versions and compatibility constraints. |
-| Features | HIGH | Clear project-aligned priorities with direct dependency mapping and anti-feature clarity. |
-| Architecture | HIGH | Patterns are conservative, standard, and consistent with existing backend layering. |
-| Pitfalls | MEDIUM-HIGH | High-quality docs-backed pitfalls; some CI/deployment behaviors still environment-specific and require local validation. |
+| Stack | HIGH | Express BFF + React Vite + Python is an industry standard approach. |
+| Features | HIGH | Table stakes for trading dashboards are very well-established. |
+| Architecture | HIGH | Monorepo proxy boundaries completely solve standard integration headaches. |
+| Pitfalls | HIGH | Common monorepo and financial UI edge cases are well understood. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Tooling finalization gap (turbo optionality):** Decide whether to adopt turbo immediately or start with pnpm-only filtering and defer orchestration complexity.
-- **Python dependency migration gap:** Existing repo uses `requirements.txt` + `environment.yml`; research recommends uv lockfile flow, so migration approach needs an explicit transition plan.
-- **Contract automation depth gap:** Define how far to go in v1 (artifact only vs enforced consumer validation).
-- **CI baseline metrics gap:** Establish expected test collection and runtime thresholds before/after migration for objective parity checks.
+- **Charting Library Selection:** The specific React charting library wasn't definitively selected, though TradingView's Lightweight Charts is heavily implied as a standard. This needs validation during Phase 3 planning.
+- **SL/TP State Management:** Need a defined strategy (e.g., Zustand vs React Context) for keeping visual drag-and-drop SL/TP controls synced with text inputs.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Context7 `/fastapi/fastapi` — FastAPI patterns, deployment guidance, deprecations.
-- Context7 `/astral-sh/uv` — lock/sync workflow and project management patterns.
-- Context7 `/pydantic/pydantic-settings` — env file behavior and configuration patterns.
-- Official docs: pnpm workspaces/filtering, Turborepo task running/caching, Nx affected/caching docs.
-- Python/Pytest/Uvicorn/GitHub Actions official docs for path resolution, test discovery, runtime and CI working-directory behavior.
+- Official Express 5.0 Release Documentation — Express setup and proxying
+- Vite 6 Documentation — Modern React build tooling
+- General BFF (Backend-For-Frontend) Architecture Patterns — Proxy boundary validation
 
 ### Secondary (MEDIUM confidence)
-- PyPI/npm registry version checks for package currency and compatibility planning.
-
-### Tertiary (LOW confidence)
-- None material; low-confidence claims were not required for roadmap-level decisions.
+- Monorepo structural best practices — `concurrently` and process management
+- Established trading UX patterns (TradingView, MetaTrader)
 
 ---
-*Research completed: 2026-04-11*
+*Research completed: 2026-04-12*
 *Ready for roadmap: yes*

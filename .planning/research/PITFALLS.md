@@ -1,197 +1,75 @@
 # Domain Pitfalls
 
-**Domain:** Live backend → `api/web` monorepo migration with independent env/runtime paths  
-**Researched:** 2026-04-11  
-**Confidence:** MEDIUM-HIGH
+**Domain:** React + Express + Python FastAPI Monorepo Integration & Forex Dashboard
+**Researched:** 2026-04-12
 
 ## Critical Pitfalls
 
-### Pitfall 1: “Moved folders, broke imports” (Python module path drift)
-**What goes wrong:**  
-After moving backend code under `api/`, import resolution changes (`ModuleNotFoundError`, wrong package roots, flaky local vs CI behavior).
+Mistakes that cause rewrites, broken deployments, or major operational issues.
 
-**Why it happens:**  
-Teams assume repo-root execution semantics still apply. Python import path depends on execution context and script location.
+### Pitfall 1: Zombie Backend Processes
+**What goes wrong:** Developers use a Node runner (like `concurrently`) or a simple bash script to run both Express and FastAPI. When they hit `Ctrl+C`, the Node process terminates, but the Python Uvicorn server is orphaned and keeps running in the background.
+**Why it happens:** OS signals (SIGTERM/SIGINT) are not propagated correctly across runtime boundaries (Node -> Shell -> Python Virtualenv/Conda).
+**Consequences:** Port 8000 stays in use. The next time the developer runs the startup script, it crashes with `OSError: [Errno 98] Address already in use`. Developers are forced to manually find and kill PIDs.
+**Prevention:** Use a robust process manager designed for cross-platform signal handling (e.g., `foreman`, `PM2`, or `honcho`), or ensure the custom Node startup script explicitly tracks/kills child process PIDs on exit.
+**Detection:** The laptop fan spins up while "idle", or `EADDRINUSE` errors appear immediately on restart.
+**Phase to Address:** Phase 2 (Infrastructure & Startup Scripting)
 
-**Consequences:**  
-API boots locally for one developer but fails in CI/containers; tests fail depending on current working directory.
+### Pitfall 2: Cross-Origin Cookie & CORS Nightmares
+**What goes wrong:** The React frontend (running on port 3000) tries to call the FastAPI backend (on port 8000) directly. Preflight `OPTIONS` requests fail, or authentication cookies/headers are dropped by the browser.
+**Why it happens:** The Express server is treated only as a static file host, rather than an API Gateway/BFF (Backend-For-Frontend).
+**Consequences:** Hours lost configuring FastAPI CORS middleware, and fragile client-side code that breaks in production when ports/domains change.
+**Prevention:** Explicitly configure the Express server to proxy `/api` requests to the Python backend (e.g., using `http-proxy-middleware`). The React app should only ever make requests to its own origin (the Express server).
+**Detection:** `Access-Control-Allow-Origin` errors flooding the browser console during local development.
+**Phase to Address:** Phase 3 (Express Server Setup)
 
-**Prevention strategy:**  
-- Treat `api/` as the Python project root and standardize all commands from that root.
-- Use explicit launch conventions (e.g., `uvicorn app.main:app --app-dir api` from repo root, or run from `api/` directly).
-- Add a migration gate: run startup and tests both from repo root and from `api/` to catch path assumptions.
+### Pitfall 3: Timezone & Timestamp Mismatches
+**What goes wrong:** Candlesticks render out of order or with gaps, and predictions overlay on the wrong candles.
+**Why it happens:** The Python API (`pandas`) outputs UTC timestamps, but the React charting library expects Unix timestamps in milliseconds or local timezone data.
+**Consequences:** The entire dashboard becomes useless for technical analysis.
+**Prevention:** Standardize all timestamp passing as Unix milliseconds. Convert explicitly in the Express BFF or React data parsing layer.
+**Detection:** Visual gaps in the chart, or the "Current Price" cursor trailing behind the last candle.
+**Phase to Address:** Phase 4 (Frontend Features)
 
-**Warning signs:**
-- `ModuleNotFoundError` after directory move.
-- Different behavior between `pytest` run from root vs `api/`.
-- Uvicorn starts only with ad-hoc `PYTHONPATH` tweaks.
-
-**Phase mapping:**  
-**Phase 1 (Restructure + boot safety):** finalize import strategy and run-command contract before any new feature work.
-
----
-
-### Pitfall 2: Cross-app env leakage (`.env` scope confusion)
-**What goes wrong:**  
-`api` and `web` read each other’s variables, or root-level `.env` accidentally overrides app-local values.
-
-**Why it happens:**  
-Dotenv and tooling precedence rules are often misunderstood. Teams keep a root `.env` “temporarily” and never remove ambiguity.
-
-**Consequences:**  
-Wrong runtime config in staging/prod, silent credential mix-ups, hard-to-debug “works on my machine” behavior.
-
-**Prevention strategy:**  
-- Enforce app-local env files only (`api/.env`, `web/.env`), no shared root runtime `.env`.
-- Document and test precedence explicitly (OS env > dotenv for pydantic-settings).
-- Add startup validation that logs non-secret config origin/sanity (e.g., expected mode/URL patterns).
-
-**Warning signs:**
-- API uses unexpected host/URL without code changes.
-- Local and CI config diverge even with same `.env` content.
-- Developers export shell vars to “fix” config repeatedly.
-
-**Phase mapping:**  
-**Phase 1 (Restructure + config isolation):** define env boundaries and remove ambiguous root-level env behavior.
-
----
-
-### Pitfall 3: CI still executes from old root assumptions
-**What goes wrong:**  
-Pipeline scripts continue to run commands in repo root, using stale paths for tests, artifacts, or startup commands.
-
-**Why it happens:**  
-Migration updates code tree, but CI defaults/working-directory settings are not migrated in lockstep.
-
-**Consequences:**  
-Green local runs but red CI; or worse, CI appears green while skipping the intended app checks.
-
-**Prevention strategy:**  
-- Explicitly set `working-directory` for app-specific jobs.
-- Split CI into `api` and `web` jobs with independent command contracts.
-- Add a temporary parity check job that verifies old paths are no longer referenced.
-
-**Warning signs:**
-- CI errors: file not found for old paths.
-- Sudden drop in test count after migration.
-- Job passes suspiciously fast after major folder move.
-
-**Phase mapping:**  
-**Phase 2 (CI/CD migration):** update and validate workflow working directories before declaring migration complete.
-
----
-
-### Pitfall 4: Test discovery drift after relocating tests/config
-**What goes wrong:**  
-Pytest rootdir/config selection changes, causing missing tests, different markers/options, or plugin behavior changes.
-
-**Why it happens:**  
-Pytest rootdir is derived from invocation paths and nearby config files; moving files without invocation discipline changes behavior.
-
-**Consequences:**  
-False confidence from partial test runs, inconsistent node IDs/cache behavior, broken coverage trends.
-
-**Prevention strategy:**  
-- Pin test entrypoints (e.g., `pytest api/tests` or run from `api/` consistently).
-- Keep one authoritative pytest config location and document it.
-- Add CI assertion for expected collected test count threshold.
-
-**Warning signs:**
-- `rootdir` in pytest header unexpectedly changes.
-- Marker warnings suddenly appear/disappear.
-- Coverage drops with no logical code deletion.
-
-**Phase mapping:**  
-**Phase 2 (Quality guardrails):** lock test invocation and verify collection parity.
-
----
-
-### Pitfall 5: Runtime command split without operational contract
-**What goes wrong:**  
-`api` and `web` have “independent commands” but no canonical scripts, so every engineer/integration runs a different variant.
-
-**Why it happens:**  
-Teams stop at folder creation and skip command standardization for local dev, CI, and deployment.
-
-**Consequences:**  
-Onboarding friction, flaky reproducibility, and deployment drift (different startup flags/watch dirs/app dirs).
-
-**Prevention strategy:**  
-- Define one canonical command set per app (dev, test, prod run).
-- Keep command wrappers in-repo (Makefile/scripts/task runner) and use them everywhere.
-- Require docs + smoke checks for each command path.
-
-**Warning signs:**
-- Team shares one-off commands in chat repeatedly.
-- Different run commands in README vs CI vs deployment manifests.
-- “It only works when I run it from X folder.”
-
-**Phase mapping:**  
-**Phase 1 (Developer experience contract):** establish canonical commands before structural migration is considered done.
+### Pitfall 4: Over-fetching Live Data
+**What goes wrong:** The React frontend polls the `/historic-data/live` endpoint too aggressively, hitting rate limits or overwhelming the Kraken API proxy.
+**Why it happens:** React Query or `useEffect` loops are configured to poll every second, but the underlying Kraken data (e.g., 1h or 15m candles) doesn't update that fast.
+**Consequences:** API rate limits get triggered (existing `RateLimitMiddleware`), breaking the UI.
+**Prevention:** Align frontend polling intervals with the actual timeframe of the OHLCV data being requested (e.g., poll every 30s for 1m candles, every 5m for 1h candles).
+**Detection:** Frequent 429 Too Many Requests errors in the network tab.
+**Phase to Address:** Phase 4 (Frontend Features)
 
 ## Moderate Pitfalls
 
-### Pitfall 1: Hidden shared-state coupling
-**What goes wrong:**  
-Code assumes shared root files/paths (model artifacts, temp dirs, caches) that break once app boundaries are isolated.
+### Pitfall 5: Environment Variable Bleeding
+**What goes wrong:** A single `.env` file at the root of the monorepo is loaded by both the Node build process and the Python backend.
+**Prevention:** Maintain strict separation of concerns. Use `api/.env` for backend secrets and `web/.env` for frontend configuration. Do not merge them globally. The React build must only embed variables explicitly prefixed with `REACT_APP_` or `VITE_`.
+**Detection:** Backend secrets (like API keys or DB passwords) appear in the minified `main.[hash].js` bundle in the browser's DevTools network tab.
+**Phase to Address:** Phase 2 & 3 (Configuration Architecture)
 
-**Prevention:**  
-Inventory filesystem dependencies; convert to app-scoped paths/config with explicit defaults.
+### Pitfall 6: Python Environment Activation Failures
+**What goes wrong:** The unified root startup script (`npm start`) fails to activate the `conda` environment before running `uvicorn`. It falls back to the system Python, resulting in `ModuleNotFoundError: No module named fastapi`.
+**Prevention:** The startup script must explicitly execute using the environment's python executable rather than relying on the ambient shell state. For example, use `conda run -n forex_prediction uvicorn ...` instead of just `uvicorn`.
+**Detection:** The API runs fine when started manually inside the `api/` folder, but crashes immediately when started via the monorepo root script.
+**Phase to Address:** Phase 2 (Infrastructure & Startup Scripting)
 
-**Warning signs:**
-- Runtime errors for missing relative files after move.
-- Artifact path fixes hardcoded in multiple places.
-
-**Phase mapping:**  
-**Phase 1:** dependency/path audit during move.
-
-### Pitfall 2: Over-scaffolding `web/` in a backend migration milestone
-**What goes wrong:**  
-Placeholder frontend scope expands into framework/tooling debates and delays API stabilization.
-
-**Prevention:**  
-Keep `web/` minimal placeholder contract (README, run stub, env example) and defer product frontend decisions.
-
-**Warning signs:**
-- PRs introduce large frontend dependency trees unrelated to migration safety.
-- API migration tasks blocked on frontend setup decisions.
-
-**Phase mapping:**  
-**Phase 1:** strict scope guardrails.
-
-## Minor Pitfalls
-
-### Pitfall 1: Tooling docs lag behind structure
-**What goes wrong:**  
-README/runbooks/onboarding still reference root commands and paths.
-
-**Prevention:**  
-Treat docs update as definition-of-done for each migration phase.
-
-**Warning signs:**
-- New contributors fail first-run setup.
-- Frequent “docs are outdated” comments on PRs.
-
-**Phase mapping:**  
-**Phase 3 (Hardening):** documentation parity pass.
+### Pitfall 7: State Desync on SL/TP Visual Dragging
+**What goes wrong:** A user drags a Stop Loss line on the chart, but the text input field doesn't update, or vice versa.
+**Prevention:** Maintain a single source of truth for SL/TP state in React (e.g., a shared context or Zustand store), ensuring both the Chart overlay and the Input forms subscribe to and mutate this single state.
+**Phase to Address:** Phase 5 (SL/TP Integration)
 
 ## Phase-Specific Warnings
 
 | Phase Topic | Likely Pitfall | Mitigation |
 |-------------|---------------|------------|
-| Phase 1: Folder migration (`api/`, `web/`) | Import/path breakage and config leakage | Lock import root strategy; enforce app-local env files only; add boot smoke tests |
-| Phase 1: Independent run commands | Command sprawl/no canonical entrypoints | Publish single command contract per app and enforce in CI/docs |
-| Phase 2: CI migration | Wrong working-directory, stale paths, skipped tests | Split app jobs; set explicit working dirs; assert collected test count |
-| Phase 2: Test/config relocation | Pytest rootdir drift | Standardize invocation path and one config source |
-| Phase 3: Deployment/runtime hardening | Env precedence surprises across environments | Validate env precedence and run startup config sanity checks |
+| **Phase 2: Unified Runner** | Zombie PIDs holding ports open on restart | Use `honcho`/`foreman` or strict Node child_process teardown capturing SIGINT. |
+| **Phase 3: Web Server Setup** | Complex CORS issues between React and FastAPI | Use Express as a reverse proxy for all `/api/*` traffic to FastAPI. |
+| **Phase 4: Frontend Charting** | Canvas rendering blocks the main thread | Use a WebGL or highly optimized Canvas library; limit initial fetch to 500 candles. |
+| **Phase 5: SL/TP Controls** | Floating point math errors | Use a library like `decimal.js` or parse everything as integers (pips). |
 
 ## Sources
 
-- Pydantic Settings docs (env file usage + precedence): https://github.com/pydantic/pydantic-settings/blob/main/docs/index.md (**HIGH**)  
-- Pytest docs (rootdir and config discovery behavior): https://github.com/pytest-dev/pytest/blob/main/doc/en/reference/customize.md (**HIGH**)  
-- Uvicorn settings docs (`--app-dir`, reload dir semantics): https://github.com/kludex/uvicorn/blob/main/docs/settings.md (**HIGH**)  
-- GitHub Actions docs (default working-directory): https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/setting-a-default-shell-and-working-directory (**HIGH**)  
-- Docker Compose docs (env files, interpolation, precedence):  
-  - https://docs.docker.com/compose/how-tos/environment-variables/set-environment-variables/  
-  - https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/ (**HIGH**)  
-- Python docs (`sys.path` initialization and execution context impact): https://docs.python.org/3/library/sys_path_init.html (**HIGH**)
+- Domain Expertise: Multi-language (Node/Python) monorepo architecture patterns.
+- Best Practices for Backend-For-Frontend (BFF) architecture.
+- Node.js `child_process` signal propagation documentation.
+- Common frontend UI/UX engineering lessons from Trading Platforms.
