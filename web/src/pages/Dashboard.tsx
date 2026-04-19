@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Chart } from '../components/Chart';
 import { useMarketData } from '../hooks/useMarketData';
 import { HealthStatus } from '../components/HealthStatus';
 
 export const Dashboard: React.FC = () => {
-    const { data, isHealthy, currentPrice } = useMarketData();
+    const [intervalMinutes, setIntervalMinutes] = useState<number>(60);
+    const { data, isHealthy, currentPrice, isValidating } = useMarketData('BTC/USD', intervalMinutes);
     const latestData = data.length > 0 ? data[data.length - 1] : null;
 
     return (
@@ -62,13 +63,24 @@ export const Dashboard: React.FC = () => {
                             <div className="px-5 py-3 flex justify-between items-center border-b border-outline-variant/10">
                                 <div className="flex space-x-1">
                                     {/* Timeframe Selectors */}
-                                    <button className="px-2 py-1 text-[10px] font-bold text-secondary bg-secondary/10 rounded transition-colors">1m</button>
-                                    <button className="px-2 py-1 text-[10px] font-bold text-outline hover:bg-surface-container-high rounded transition-colors">5m</button>
-                                    <button className="px-2 py-1 text-[10px] font-bold text-outline hover:bg-surface-container-high rounded transition-colors">15m</button>
-                                    <button className="px-2 py-1 text-[10px] font-bold text-outline hover:bg-surface-container-high rounded transition-colors">1h</button>
-                                    <button className="px-2 py-1 text-[10px] font-bold text-outline hover:bg-surface-container-high rounded transition-colors">4h</button>
-                                    <button className="px-2 py-1 text-[10px] font-bold text-outline hover:bg-surface-container-high rounded transition-colors">D</button>
-                                    <button className="px-2 py-1 text-[10px] font-bold text-outline hover:bg-surface-container-high rounded transition-colors">W</button>
+                                    {[
+                                        { label: '15m', value: 15 },
+                                        { label: '1H', value: 60 },
+                                        { label: '4H', value: 240 },
+                                        { label: '1D', value: 1440 },
+                                    ].map(tf => (
+                                        <button 
+                                            key={tf.value}
+                                            onClick={() => setIntervalMinutes(tf.value)}
+                                            className={`px-2 py-1 text-[10px] font-bold rounded transition-colors ${
+                                                intervalMinutes === tf.value 
+                                                    ? 'text-secondary bg-secondary/10' 
+                                                    : 'text-outline hover:bg-surface-container-high'
+                                            }`}
+                                        >
+                                            {tf.label}
+                                        </button>
+                                    ))}
                                 </div>
                                 <div className="flex items-center space-x-3">
                                     <span className="material-symbols-outlined text-outline cursor-pointer hover:text-primary transition-colors text-lg" data-icon="photo_camera">photo_camera</span>
@@ -77,6 +89,11 @@ export const Dashboard: React.FC = () => {
                             </div>
                             <div className="relative h-[420px] w-full p-4">
                                 <Chart data={data} />
+                                {isValidating && isHealthy && (
+                                    <div className="absolute inset-0 bg-background/50 backdrop-blur-sm m-4 z-10 flex flex-col items-center justify-center rounded">
+                                        <span className="material-symbols-outlined text-secondary animate-spin text-4xl">sync</span>
+                                    </div>
+                                )}
                                 {!isHealthy && (
                                     <div className="absolute inset-0 bg-surface-container-highest/60 backdrop-blur-sm m-4 z-10 flex flex-col items-center justify-center rounded">
                                         <div className="bg-surface-container border border-tertiary/30 px-6 py-4 rounded-lg shadow-xl flex flex-col justify-center items-center gap-3">
