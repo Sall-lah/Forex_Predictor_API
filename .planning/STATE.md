@@ -30,3 +30,11 @@ progress:
 ## Blockers
 
 - None at the moment.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260419-erg | Refactor react so it does not use any useEffect | 2026-04-19 | 9dacf74 | [260419-erg-refactor-react-so-it-does-not-use-any-us](./quick/260419-erg-refactor-react-so-it-does-not-use-any-us/) |
+
+Last activity: 2026-04-19 - Completed quick task 260419-erg: Refactor react so it does not use any useEffect
