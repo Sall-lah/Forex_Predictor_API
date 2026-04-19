@@ -35,7 +35,7 @@ def test_predict_success(mocker):
     service = PredictionService()
 
     # Mock request
-    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     # Mock Kraken API response
     mock_kraken_payload = {
@@ -90,8 +90,7 @@ def test_predict_success(mocker):
     # Assert
     assert isinstance(response, PredictionResponse)
     assert response.pair == "XXBTZUSD"
-    assert response.asset == "BTCUSD"
-    assert response.probability_up == 0.65
+        assert response.probability_up == 0.65
     assert response.probability_down == 0.25
     assert response.probability_straight == 0.10
 
@@ -105,7 +104,7 @@ def test_predict_kraken_api_error(mocker):
     """Test handling of Kraken API fetch error."""
     # Setup
     service = PredictionService()
-    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     # Mock API client to raise error
     mock_api_client = mocker.patch.object(service.api_client, "fetch_ohlcv_data")
@@ -122,7 +121,7 @@ def test_predict_insufficient_data(mocker):
     """Test handling of insufficient data for feature extraction."""
     # Setup
     service = PredictionService()
-    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     # Mock Kraken API with minimal data
     mock_kraken_payload = {
@@ -163,7 +162,7 @@ def test_predict_model_not_loaded(mocker):
     """Test handling of ML model loading failure."""
     # Setup
     service = PredictionService()
-    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     # Mock successful data fetch and preprocessing
     mock_kraken_payload = {
@@ -217,7 +216,7 @@ def test_predict_feature_extraction_error(mocker):
     """Test handling of feature extraction errors."""
     # Setup
     service = PredictionService()
-    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     # Mock successful data fetch
     mock_kraken_payload = {
@@ -258,7 +257,7 @@ def test_predict_different_asset(mocker):
     """Test prediction for ETHUSD asset."""
     # Setup
     service = PredictionService()
-    request = PredictionRequest(pair="XETHZUSD", asset="ETHUSD")
+    request = PredictionRequest(pair="XETHZUSD")
 
     # Mock all dependencies
     mock_kraken_payload = {
@@ -306,8 +305,7 @@ def test_predict_different_asset(mocker):
 
     # Assert
     assert response.pair == "XETHZUSD"
-    assert response.asset == "ETHUSD"
-    assert response.probability_up == 0.45
+        assert response.probability_up == 0.45
     assert response.probability_down == 0.30
     assert response.probability_straight == 0.25
 
@@ -320,7 +318,7 @@ def test_predict_different_asset(mocker):
 def test_predict_invalid_model_output_raises_data_validation_error(mocker):
     """Invalid predict_proba payloads should be surfaced as domain validation errors."""
     service = PredictionService()
-    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     mock_kraken_payload = {
         "error": [],
@@ -363,7 +361,7 @@ def test_predict_invalid_model_output_raises_data_validation_error(mocker):
 def test_predict_aligns_model_features_before_predict_proba(mocker):
     """Prediction input should be reordered to the model feature contract."""
     service = PredictionService()
-    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     mocker.patch.object(
         service.api_client,
@@ -401,7 +399,7 @@ def test_predict_aligns_model_features_before_predict_proba(mocker):
 def test_predict_missing_model_required_feature_raises_data_validation_error(mocker):
     """Missing model-required columns should fail before inference."""
     service = PredictionService()
-    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     mocker.patch.object(
         service.api_client,
@@ -432,7 +430,7 @@ def test_predict_missing_model_required_feature_raises_data_validation_error(moc
 def test_predict_with_inf_feature_raises_data_validation_error(mocker):
     """Aligned model features containing Inf/NaN should be rejected."""
     service = PredictionService()
-    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     mocker.patch.object(
         service.api_client,
@@ -464,7 +462,7 @@ def test_predict_with_inf_feature_raises_data_validation_error(mocker):
 
 def test_predict_with_injected_mocks_orchestrates_dependencies():
     """PredictionService should orchestrate mocked boundaries deterministically."""
-    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     mock_api_client = Mock()
     mock_api_client.fetch_ohlcv_data.return_value = {
@@ -512,8 +510,7 @@ def test_predict_with_injected_mocks_orchestrates_dependencies():
 
     assert isinstance(response, PredictionResponse)
     assert response.pair == "XXBTZUSD"
-    assert response.asset == "BTCUSD"
-    assert response.probability_up == 0.8
+        assert response.probability_up == 0.8
     assert response.probability_down == 0.0
     assert response.probability_straight == 0.2
 
@@ -587,7 +584,7 @@ def test_model_loader_get_model_returns_loaded_model(monkeypatch, tmp_path):
 def test_predict_missing_model_file_reports_resolved_path(mocker, monkeypatch):
     """PredictionService should surface resolved-path context for missing artifacts."""
     service = PredictionService()
-    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     mocker.patch.object(
         service.api_client,
@@ -627,7 +624,7 @@ def test_predict_invalid_model_without_predict_proba_raises_model_not_loaded_err
 ):
     """PredictionService should reject loaded artifacts lacking predict_proba."""
     service = PredictionService()
-    request = PredictionRequest(pair="XXBTZUSD", asset="BTCUSD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     mocker.patch.object(
         service.api_client,

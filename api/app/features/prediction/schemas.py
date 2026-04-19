@@ -15,7 +15,7 @@ class PredictionRequest(BaseModel):
     """
     Request for forex price movement prediction.
 
-    Contains trading pair and asset identifier to fetch data and make prediction.
+    Contains trading pair identifier to fetch data and make prediction.
     """
 
     pair: str = Field(
@@ -23,15 +23,6 @@ class PredictionRequest(BaseModel):
         min_length=1,
         description="Kraken trading pair (e.g., 'BTC/USD' for BTCUSD)",
         examples=["BTC/USD", "ETH/USD"],
-    )
-    asset: Literal["BTCUSD", "ETHUSD"] = Field(
-        ...,
-        description="Asset name for model feature encoding (BTCUSD or ETHUSD)",
-        examples=["BTCUSD", "ETHUSD"],
-    )
-    interval: Literal[1, 5, 15, 30, 60, 240, 1440, 10080, 21600] = Field(
-        1,
-        description="Time frame interval in minutes",
     )
 
 
@@ -45,10 +36,6 @@ class PredictionResponse(BaseModel):
     pair: str = Field(
         ...,
         description="Trading pair that was analyzed",
-    )
-    asset: str = Field(
-        ...,
-        description="Asset name used for prediction",
     )
     probability_up: float = Field(
         ...,

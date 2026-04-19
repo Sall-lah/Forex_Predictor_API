@@ -175,14 +175,13 @@ class OHLCVPreprocessor:
             )
 
     def extract_features(
-        self, df: pd.DataFrame, asset: Literal["BTCUSD", "ETHUSD"]
+        self, df: pd.DataFrame
     ) -> pd.DataFrame:
         """
         Extract all features from OHLCV data.
 
         Args:
             df: DataFrame with OHLCV columns (timestamp, open, high, low, close, volume)
-            asset: Asset name (BTCUSD or ETHUSD)
 
         Returns:
             DataFrame with extracted features, OHLC columns dropped
@@ -480,7 +479,6 @@ class PredictionService:
 
         return PredictionResponse(
             pair=request.pair,
-            asset=request.asset,
             probability_up=prob_up,
             probability_down=prob_down,
             probability_straight=prob_straight,
@@ -490,15 +488,14 @@ class PredictionService:
         """Fetch and parse Kraken OHLCV payload into a DataFrame."""
         logger.info("Fetching OHLCV data for '%s'", request.pair)
         payload = self.api_client.fetch_ohlcv_data(
-            request.pair, count=settings.PREDICTION_FETCH_CANDLES, interval=request.interval
+            request.pair, count=settings.PREDICTION_FETCH_CANDLES, interval=60
         )
         ohlcv_data = OHLCVDataFrame.from_kraken_response(payload)
 
         logger.info(
-            "Fetched %d candles for '%s' (interval: %dm)",
+            "Fetched %d candles for '%s' (interval: 60m)",
             len(ohlcv_data.df),
             request.pair,
-            request.interval,
         )
         return ohlcv_data.df
 
@@ -506,8 +503,8 @@ class PredictionService:
         self, historic_df: pd.DataFrame, request: PredictionRequest
     ) -> pd.DataFrame:
         """Extract model features for the requested asset."""
-        logger.info("Extracting features for '%s'", request.asset)
-        df_features = self.preprocessor.extract_features(historic_df, request.asset)
+        logger.info("Extracting features for '%s'", request.pair)
+        df_features = self.preprocessor.extract_features(historic_df)
         logger.info(
             "Feature extraction completed: %d rows, %d features",
             len(df_features),

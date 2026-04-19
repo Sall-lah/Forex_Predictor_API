@@ -31,7 +31,6 @@ def test_predict_btcusd_live():
     service = PredictionService()
     request = PredictionRequest(
         pair="BTC/USD",
-        asset="BTCUSD",
     )
 
     # Execute - this will:
@@ -49,8 +48,7 @@ def test_predict_btcusd_live():
 
     # Assert
     assert response.pair == "BTC/USD"
-    assert response.asset == "BTCUSD"
-    assert 0.0 <= response.probability_up <= 1.0
+        assert 0.0 <= response.probability_up <= 1.0
     assert 0.0 <= response.probability_down <= 1.0
     assert 0.0 <= response.probability_straight <= 1.0
 
@@ -71,7 +69,6 @@ def test_predict_ethusd_live():
     service = PredictionService()
     request = PredictionRequest(
         pair="ETH/USD",
-        asset="ETHUSD",
     )
 
     # Execute
@@ -84,8 +81,7 @@ def test_predict_ethusd_live():
 
     # Assert
     assert response.pair == "ETH/USD"
-    assert response.asset == "ETHUSD"
-    assert 0.0 <= response.probability_up <= 1.0
+        assert 0.0 <= response.probability_up <= 1.0
     assert 0.0 <= response.probability_down <= 1.0
     assert 0.0 <= response.probability_straight <= 1.0
 
@@ -109,7 +105,6 @@ def test_predict_via_api_btcusd_live(client):
         "/api/v1/prediction/predict",
         json={
             "pair": "BTC/USD",
-            "asset": "BTCUSD",
         },
     )
 
@@ -123,8 +118,7 @@ def test_predict_via_api_btcusd_live(client):
     data = response.json()
 
     assert data["pair"] == "BTC/USD"
-    assert data["asset"] == "BTCUSD"
-    assert "probability_up" in data
+        assert "probability_up" in data
     assert "probability_down" in data
     assert "probability_straight" in data
     assert 0.0 <= data["probability_up"] <= 1.0
@@ -144,7 +138,6 @@ def test_predict_via_api_ethusd_live(client):
         "/api/v1/prediction/predict",
         json={
             "pair": "ETH/USD",
-            "asset": "ETHUSD",
         },
     )
 
@@ -158,8 +151,7 @@ def test_predict_via_api_ethusd_live(client):
     data = response.json()
 
     assert data["pair"] == "ETH/USD"
-    assert data["asset"] == "ETHUSD"
-    assert 0.0 <= data["probability_up"] <= 1.0
+        assert 0.0 <= data["probability_up"] <= 1.0
     assert 0.0 <= data["probability_down"] <= 1.0
     assert 0.0 <= data["probability_straight"] <= 1.0
 
@@ -177,7 +169,6 @@ def test_predict_model_consistency():
     service = PredictionService()
     request = PredictionRequest(
         pair="BTC/USD",
-        asset="BTCUSD",
     )
 
     # Make two predictions
