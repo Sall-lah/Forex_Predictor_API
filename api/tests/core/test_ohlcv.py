@@ -22,7 +22,7 @@ def test_fetch_ohlcv_data_maps_transport_failures_to_data_fetch_error(mocker) ->
     with pytest.raises(
         DataFetchError, match="Network error while fetching Kraken data"
     ):
-        client.fetch_ohlcv_data(pair="XXBTZUSD", hours=24, interval=60)
+        client.fetch_ohlcv_data(pair="XXBTZUSD", count=24, interval=60)
 
 
 def test_from_kraken_response_parses_payload_and_drops_incomplete_latest_candle() -> (

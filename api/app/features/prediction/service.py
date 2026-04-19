@@ -490,7 +490,7 @@ class PredictionService:
         """Fetch and parse Kraken OHLCV payload into a DataFrame."""
         logger.info("Fetching OHLCV data for '%s'", request.pair)
         payload = self.api_client.fetch_ohlcv_data(
-            request.pair, settings.PREDICTION_FETCH_HOURS, interval=request.interval
+            request.pair, count=settings.PREDICTION_FETCH_CANDLES, interval=request.interval
         )
         ohlcv_data = OHLCVDataFrame.from_kraken_response(payload)
 

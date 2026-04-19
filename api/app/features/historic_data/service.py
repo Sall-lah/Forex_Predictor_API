@@ -20,7 +20,7 @@ class HistoricDataService:
     def fetch_hourly_ohlcv(self, pair: str, interval: int = 1) -> HistoricDataResponse:
         """Fetch one week of OHLCV candles for the given pair and interval."""
         payload = self.api_client.fetch_ohlcv_data(
-            pair, settings.KRAKEN_DEFAULT_HOURS, interval=interval
+            pair, count=settings.KRAKEN_DEFAULT_CANDLES, interval=interval
         )
 
         ohlcv_data = OHLCVDataFrame.from_kraken_response(payload)

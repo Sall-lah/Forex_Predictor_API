@@ -29,14 +29,14 @@ class Settings(BaseSettings):
     # Kraken API settings
     KRAKEN_OHLC_URL: str = "https://api.kraken.com/0/public/OHLC"
     KRAKEN_TIMEOUT: float = 15.0
-    KRAKEN_DEFAULT_HOURS: int = 168
+    KRAKEN_DEFAULT_CANDLES: int = 720
 
     # ML Model settings
     MODEL_DIR: str = "app/features/prediction/ml_models"
     MODEL_FILENAME: str = "lightgbm_model_forex.pkl"
 
     # Feature extraction settings
-    PREDICTION_FETCH_HOURS: int = 200
+    PREDICTION_FETCH_CANDLES: int = 720
     MIN_ROWS_FOR_FEATURES: int = 168
 
     # Rate limit defaults

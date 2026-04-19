@@ -24,24 +24,24 @@ class KrakenAPIClient:
         self.timeout = timeout or settings.KRAKEN_TIMEOUT
 
     def fetch_ohlcv_data(
-        self, pair: str, hours: int, interval: int = 1
+        self, pair: str, count: int, interval: int = 1
     ) -> dict:
         """Fetch raw OHLCV payload from Kraken for a pair/time window and interval."""
         query_params = self._build_query_params(
-            pair=pair, hours=hours, interval=interval
+            pair=pair, count=count, interval=interval
         )
         payload = self._request_payload(pair=pair, query_params=query_params)
         self._validate_api_response(payload=payload, pair=pair)
         return payload
 
     def _build_query_params(
-        self, pair: str, hours: int, interval: int
+        self, pair: str, count: int, interval: int
     ) -> dict[str, int | str]:
         """Build Kraken OHLC query parameters for pair and time range."""
         return {
             "pair": pair,
             "interval": interval,
-            "since": self._calculate_since_timestamp(hours),
+            "since": self._calculate_since_timestamp(count, interval),
         }
 
     def _request_payload(self, pair: str, query_params: dict[str, int | str]) -> dict:
@@ -77,10 +77,10 @@ class KrakenAPIClient:
         return payload
 
     @staticmethod
-    def _calculate_since_timestamp(hours: int) -> int:
-        """Calculate Unix timestamp for hours ago, UTC-aligned."""
+    def _calculate_since_timestamp(count: int, interval: int) -> int:
+        """Calculate Unix timestamp for count ago, UTC-aligned."""
         now = pd.Timestamp.now(tz="UTC").floor("h")
-        return int(now.timestamp() - (hours * 3600))
+        return int(now.timestamp() - (count * interval * 60))
 
     @staticmethod
     def _validate_api_response(payload: dict, pair: str) -> None:
