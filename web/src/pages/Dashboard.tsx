@@ -5,7 +5,7 @@ import { HealthStatus } from '../components/HealthStatus';
 
 export const Dashboard: React.FC = () => {
     const [intervalMinutes, setIntervalMinutes] = useState<number>(60);
-    const { data, isHealthy, currentPrice, isValidating } = useMarketData('BTC/USD', intervalMinutes);
+    const { data, isHealthy, currentPrice, isLoading } = useMarketData('BTC/USD', intervalMinutes);
     const latestData = data.length > 0 ? data[data.length - 1] : null;
 
     return (
@@ -89,7 +89,7 @@ export const Dashboard: React.FC = () => {
                             </div>
                             <div className="relative h-[420px] w-full p-4">
                                 <Chart data={data} />
-                                {isValidating && isHealthy && (
+                                {isLoading && isHealthy && (
                                     <div className="absolute inset-0 bg-background/50 backdrop-blur-sm m-4 z-10 flex flex-col items-center justify-center rounded">
                                         <span className="material-symbols-outlined text-secondary animate-spin text-4xl">sync</span>
                                     </div>

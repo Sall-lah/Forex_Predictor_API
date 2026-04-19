@@ -30,7 +30,7 @@ const fetcher = async (url: string) => {
 export const useMarketData = (pair: string = 'BTC/USD', intervalMinutes: number = 60) => {
     const url = `/api/v1/historic-data/live?pair=${encodeURIComponent(pair)}&interval=${intervalMinutes}`;
     
-    const { data: mappedRecords, error, isValidating } = useSWR<OHLCVData[]>(url, fetcher, {
+    const { data: mappedRecords, error, isValidating, isLoading } = useSWR<OHLCVData[]>(url, fetcher, {
         refreshInterval: 15000,
     });
 
@@ -46,6 +46,7 @@ export const useMarketData = (pair: string = 'BTC/USD', intervalMinutes: number 
         error: error || null, 
         isHealthy, 
         currentPrice,
-        isValidating
+        isValidating,
+        isLoading
     };
 };
