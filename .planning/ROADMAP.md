@@ -14,4 +14,4 @@ Plans:
 **Plans:** 1 plans
 
 Plans:
-- [ ] 02-01-PLAN.md - Update useMarketData hook, add interval toggle buttons to dashboard, and document proxy passthrough.
+- [x] 02-01-PLAN.md - Update useMarketData hook, add interval toggle buttons to dashboard, and document proxy passthrough.
