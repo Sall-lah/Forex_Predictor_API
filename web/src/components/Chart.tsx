@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useEffect } from 'react';
 import { createChart } from 'lightweight-charts';
 import type { IChartApi, ISeriesApi, CandlestickData, Time } from 'lightweight-charts';
 import type { OHLCVData } from '../hooks/useMarketData';
@@ -108,12 +108,14 @@ export const Chart: React.FC<ChartProps> = ({ data }) => {
         series.setData(uniqueData);
     };
 
-    if (data !== prevDataRef.current) {
-        prevDataRef.current = data;
-        if (seriesRef.current && data.length > 0) {
-            applyDataToSeries(data, seriesRef.current);
+    useEffect(() => {
+        if (data !== prevDataRef.current) {
+            prevDataRef.current = data;
+            if (seriesRef.current && data.length > 0) {
+                applyDataToSeries(data, seriesRef.current);
+            }
         }
-    }
+    }, [data]);
 
     return (
         <div ref={chartContainerRef} className="absolute inset-0 bg-[#0e0e0e]" />
