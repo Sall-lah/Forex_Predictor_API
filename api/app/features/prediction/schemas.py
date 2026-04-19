@@ -30,7 +30,7 @@ class PredictionRequest(BaseModel):
         examples=["BTCUSD", "ETHUSD"],
     )
     interval: Literal[1, 5, 15, 30, 60, 240, 1440, 10080, 21600] = Field(
-        60,
+        1,
         description="Time frame interval in minutes",
     )
 

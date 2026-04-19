@@ -4,7 +4,7 @@ import { useMarketData } from '../hooks/useMarketData';
 import { HealthStatus } from '../components/HealthStatus';
 
 export const Dashboard: React.FC = () => {
-    const [intervalMinutes, setIntervalMinutes] = useState<number>(60);
+    const [intervalMinutes, setIntervalMinutes] = useState<number>(1);
     const { data, isHealthy, currentPrice, isLoading } = useMarketData('BTC/USD', intervalMinutes);
     const latestData = data.length > 0 ? data[data.length - 1] : null;
 
@@ -64,10 +64,15 @@ export const Dashboard: React.FC = () => {
                                 <div className="flex space-x-1">
                                     {/* Timeframe Selectors */}
                                     {[
+                                        { label: '1m', value: 1 },
+                                        { label: '5m', value: 5 },
                                         { label: '15m', value: 15 },
+                                        { label: '30m', value: 30 },
                                         { label: '1H', value: 60 },
                                         { label: '4H', value: 240 },
                                         { label: '1D', value: 1440 },
+                                        { label: '1W', value: 10080 },
+                                        { label: '15D', value: 21600 },
                                     ].map(tf => (
                                         <button 
                                             key={tf.value}

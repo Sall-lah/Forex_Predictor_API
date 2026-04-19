@@ -39,7 +39,7 @@ async def get_live_data(
         examples=["BTC/USD"],
     ),
     interval: int = Query(
-        60,
+        1,
         description="Time frame interval in minutes",
         enum=[1, 5, 15, 30, 60, 240, 1440, 10080, 21600],
     ),
