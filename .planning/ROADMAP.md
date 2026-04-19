@@ -1,17 +1,22 @@
 # Roadmap: Timeframe Interval Support
 
-## Phase 1: API Updates
+## Milestones
 
-**Goal:** Update API schemas, client, services, and routers for interval
-**Plans:** 1 plans
+- ✅ **v1.0 Timeframe Interval Support** — Phases 1-2 (shipped 2026-04-19)
 
-Plans:
-- [x] 01-api-updates-01-PLAN.md - Update API schemas, client, services, and routers for interval
+## Phases
 
-## Phase 2: Express / Frontend Updates
+<details>
+<summary>✅ v1.0 Timeframe Interval Support (Phases 1-2) — SHIPPED 2026-04-19</summary>
 
-**Goal:** Update the Express proxy and React frontend to support UI selection of the timeframe interval.
-**Plans:** 1 plans
+- [x] Phase 1: API Updates (1/1 plans) — completed 2026-04-12
+- [x] Phase 2: Express / Frontend Updates (1/1 plans) — completed 2026-04-19
 
-Plans:
-- [x] 02-01-PLAN.md - Update useMarketData hook, add interval toggle buttons to dashboard, and document proxy passthrough.
+</details>
+
+## Progress
+
+| Phase             | Milestone | Plans Complete | Status      | Completed  |
+| ----------------- | --------- | -------------- | ----------- | ---------- |
+| 1. API Updates    | v1.0      | 1/1            | Complete    | 2026-04-12 |
+| 2. Express / UI   | v1.0      | 1/1            | Complete    | 2026-04-19 |
