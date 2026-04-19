@@ -24,10 +24,9 @@ class KrakenAPIClient:
         self.timeout = timeout or settings.KRAKEN_TIMEOUT
 
     def fetch_ohlcv_data(
-        self, pair: str, hours: int, interval: int | None = None
+        self, pair: str, hours: int, interval: int
     ) -> dict:
-        """Fetch raw OHLCV payload from Kraken for a pair/time window and optional interval."""
-        interval = interval or settings.KRAKEN_HOURLY_INTERVAL
+        """Fetch raw OHLCV payload from Kraken for a pair/time window and interval."""
         query_params = self._build_query_params(
             pair=pair, hours=hours, interval=interval
         )
