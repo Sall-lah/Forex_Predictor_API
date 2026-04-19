@@ -29,7 +29,6 @@ class Settings(BaseSettings):
     # Kraken API settings
     KRAKEN_OHLC_URL: str = "https://api.kraken.com/0/public/OHLC"
     KRAKEN_TIMEOUT: float = 15.0
-    KRAKEN_HOURLY_INTERVAL: int = 60
     KRAKEN_DEFAULT_HOURS: int = 168
 
     # ML Model settings
