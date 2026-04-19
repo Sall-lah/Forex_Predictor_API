@@ -6,8 +6,12 @@
 **Plans:** 1 plans
 
 Plans:
-- [x] 01-api-updates-01-PLAN.md — Update API schemas, client, services, and routers for interval
+- [x] 01-api-updates-01-PLAN.md - Update API schemas, client, services, and routers for interval
 
 ## Phase 2: Express / Frontend Updates
-- **Task 2.1:** Pass the parameter in the Express proxy to the backend if needed.
-- **Task 2.2:** Update the React hook `useMarketData.ts` to pass the interval if chosen by the UI.
+
+**Goal:** Update the Express proxy and React frontend to support UI selection of the timeframe interval.
+**Plans:** 1 plans
+
+Plans:
+- [ ] 02-01-PLAN.md - Update useMarketData hook, add interval toggle buttons to dashboard, and document proxy passthrough.
