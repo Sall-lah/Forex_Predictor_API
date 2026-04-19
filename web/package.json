@@ -28,6 +28,7 @@
     "http-proxy-middleware": "^3.0.5",
     "lightweight-charts": "^4.2.0",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "swr": "^2.4.1"
   }
 }

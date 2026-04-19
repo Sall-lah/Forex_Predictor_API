@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import useSWR from 'swr';
 
 export interface OHLCVData {
     time: string | number;
@@ -9,63 +9,42 @@ export interface OHLCVData {
     volume: number;
 }
 
+const fetcher = async (url: string) => {
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const result = await response.json();
+    
+    const rawRecords = Array.isArray(result) ? result : (result.data || []);
+    return rawRecords.map((record: any) => ({
+        time: record.timestamp || record.time,
+        open: record.open,
+        high: record.high,
+        low: record.low,
+        close: record.close,
+        volume: record.volume
+    }));
+};
+
 export const useMarketData = (pair: string = 'BTC/USD', intervalMinutes: number = 60) => {
-    const [data, setData] = useState<OHLCVData[]>([]);
-    const [error, setError] = useState<Error | null>(null);
-    const [isHealthy, setIsHealthy] = useState<boolean>(true);
-    const [currentPrice, setCurrentPrice] = useState<number | null>(null);
+    const url = `/api/v1/historic-data/live?pair=${encodeURIComponent(pair)}&interval=${intervalMinutes}`;
+    
+    const { data: mappedRecords, error } = useSWR<OHLCVData[]>(url, fetcher, {
+        refreshInterval: 15000,
+    });
 
-    useEffect(() => {
-        let isMounted = true;
+    const isHealthy = !error;
+    let currentPrice: number | null = null;
+    
+    if (mappedRecords && mappedRecords.length > 0) {
+        currentPrice = mappedRecords[mappedRecords.length - 1].close;
+    }
 
-        const fetchData = async () => {
-            try {
-                // Vite proxy should route this to backend
-                const response = await fetch(`/api/v1/historic-data/live?pair=${encodeURIComponent(pair)}&interval=${intervalMinutes}`);
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const result = await response.json();
-                
-                if (!isMounted) return;
-
-                // Standardizing response payload assumption
-                const rawRecords = Array.isArray(result) ? result : (result.data || []);
-                const mappedRecords = rawRecords.map((record: any) => ({
-                    time: record.timestamp || record.time,
-                    open: record.open,
-                    high: record.high,
-                    low: record.low,
-                    close: record.close,
-                    volume: record.volume
-                }));
-                
-                setData(mappedRecords);
-                
-                if (mappedRecords.length > 0) {
-                    const latest = mappedRecords[mappedRecords.length - 1];
-                    setCurrentPrice(latest.close);
-                }
-                
-                setIsHealthy(true);
-                setError(null);
-            } catch (err) {
-                console.error("Market data fetch failed:", err);
-                if (isMounted) {
-                    setIsHealthy(false);
-                    setError(err instanceof Error ? err : new Error('Unknown error'));
-                }
-            }
-        };
-
-        fetchData();
-        const interval = setInterval(fetchData, 15000); // 15 second polling
-
-        return () => {
-            isMounted = false;
-            clearInterval(interval);
-        };
-    }, [pair, intervalMinutes]);
-
-    return { data, error, isHealthy, currentPrice };
+    return { 
+        data: mappedRecords || [], 
+        error: error || null, 
+        isHealthy, 
+        currentPrice 
+    };
 };
