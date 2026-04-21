@@ -30,9 +30,9 @@ from app.core.exceptions import (
 )
 from app.shared.ohlcv import KrakenAPIClient, OHLCVDataFrame
 from app.features.prediction.schemas import PredictionRequest, PredictionResponse
+from app.shared.ohlcv import KrakenProvider, OHLCVDataFrame
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 
 class ModelLoader:
@@ -431,20 +431,11 @@ class PredictionService:
 
     def __init__(
         self,
-        api_client: KrakenAPIClient | None = None,
-        preprocessor: OHLCVPreprocessor | None = None,
+        api_client: KrakenProvider | None = None,
         model_loader: ModelLoader | None = None,
     ) -> None:
-        """
-        Initialize service with optional dependencies.
-
-        Args:
-            api_client: Client for Kraken API (defaults to KrakenAPIClient)
-            preprocessor: Data preprocessor (defaults to OHLCVPreprocessor)
-            model_loader: Model loader instance (defaults to ModelLoader singleton)
-        """
-        self.api_client = api_client or KrakenAPIClient()
-        self.preprocessor = preprocessor or OHLCVPreprocessor()
+        """Inject dependencies or instantiate defaults."""
+        self.api_client = api_client or KrakenProvider()
         self.model_loader = model_loader or ModelLoader()
 
     def predict(self, request: PredictionRequest) -> PredictionResponse:
@@ -485,12 +476,12 @@ class PredictionService:
         )
 
     def _fetch_historic_dataframe(self, request: PredictionRequest) -> pd.DataFrame:
-        """Fetch and parse Kraken OHLCV payload into a DataFrame."""
+        """Fetch and parse provider OHLCV payload into a DataFrame."""
         logger.info("Fetching OHLCV data for '%s'", request.pair)
         payload = self.api_client.fetch_ohlcv_data(
             request.pair, count=settings.PREDICTION_FETCH_CANDLES, interval=60
         )
-        ohlcv_data = OHLCVDataFrame.from_kraken_response(payload)
+        ohlcv_data = OHLCVDataFrame.from_provider_response(payload)
 
         logger.info(
             "Fetched %d candles for '%s' (interval: 60m)",

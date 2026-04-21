@@ -13,7 +13,7 @@ from app.core.exceptions import DataFetchError
 settings = get_settings()
 
 
-class KrakenAPIClient:
+class KrakenProvider:
     """HTTP client wrapper for Kraken OHLC endpoint interactions."""
 
     def __init__(
@@ -25,14 +25,43 @@ class KrakenAPIClient:
 
     def fetch_ohlcv_data(
         self, pair: str, count: int, interval: int = 1
-    ) -> dict:
-        """Fetch raw OHLCV payload from Kraken for a pair/time window and interval."""
+    ) -> list[dict[str, object]]:
+        """Fetch raw OHLCV payload from Kraken and preprocess to standard format."""
         query_params = self._build_query_params(
             pair=pair, count=count, interval=interval
         )
         payload = self._request_payload(pair=pair, query_params=query_params)
         self._validate_api_response(payload=payload, pair=pair)
-        return payload
+        
+        return self._preprocess_payload(payload=payload, pair=pair)
+        
+    def _preprocess_payload(self, payload: dict, pair: str) -> list[dict[str, object]]:
+        """Map Kraken specific payload into standard OHLCV list of dicts."""
+        try:
+            result = payload["result"]
+            pair_key = next(key for key in result if key != "last")
+            raw_candles = result[pair_key]
+            last_completed_candle = result["last"]
+
+            # Exclude incomplete candle
+            if raw_candles and raw_candles[-1][0] == last_completed_candle:
+                pass
+            elif raw_candles and last_completed_candle != raw_candles[-1][0]:
+                raw_candles = raw_candles[:-1]
+
+            return [
+                {
+                    "timestamp": c[0],
+                    "open": c[1],
+                    "high": c[2],
+                    "low": c[3],
+                    "close": c[4],
+                    "volume": c[6],
+                }
+                for c in raw_candles
+            ]
+        except (KeyError, StopIteration, IndexError) as error:
+            raise DataFetchError(f"Kraken processing error for '{pair}': {error}") from error
 
     def _build_query_params(
         self, pair: str, count: int, interval: int

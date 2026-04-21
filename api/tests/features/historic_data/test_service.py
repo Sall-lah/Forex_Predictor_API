@@ -37,29 +37,21 @@ def test_fetch_hourly_ohlcv_success(mocker):
         l = o - 500.0
         c = o + 100.0
         dummy_data.append(
-            [
-                base_time + i * 3600,  # timestamp
-                str(o),
-                str(h),
-                str(l),
-                str(c),  # open, high, low, close
-                "60000.0",
-                "1.5",
-                10,  # vwap, volume, count
-            ]
+            {
+                "timestamp": base_time + i * 3600,
+                "open": o,
+                "high": h,
+                "low": l,
+                "close": c,
+                "volume": 1.5,
+            }
         )
 
-    mock_payload = {
-        "error": [],
-        "result": {pair: dummy_data, "last": base_time + 167 * 3600},
-    }
+    mock_payload = dummy_data
 
-    mock_response = Mock()
-    mock_response.json.return_value = mock_payload
-    mock_response.raise_for_status.return_value = None
-
-    # Override httpx.get globally during this test
-    mocker.patch("httpx.get", return_value=mock_response)
+    # Override the api_client.fetch_ohlcv_data directly instead of httpx
+    # to test the service boundary
+    mocker.patch.object(service.api_client, "fetch_ohlcv_data", return_value=mock_payload)
 
     response = service.fetch_hourly_ohlcv(pair)
 
@@ -88,21 +80,18 @@ def test_fetch_hourly_ohlcv_success(mocker):
 
 def test_fetch_hourly_ohlcv_api_error(mocker):
     """
-    Simulates Kraken responding with an error inside the JSON payload.
-    Ensure our system intercepts this and raises our domain `DataFetchError`.
+    Simulates provider responding with an error.
     """
     service = HistoricDataService()
     pair = "INVALID"
 
-    mock_payload = {"error": ["EQuery:Unknown asset pair"]}
+    mocker.patch.object(
+        service.api_client, 
+        "fetch_ohlcv_data", 
+        side_effect=DataFetchError("Provider API error")
+    )
 
-    mock_response = Mock()
-    mock_response.json.return_value = mock_payload
-    mock_response.raise_for_status.return_value = None
-
-    mocker.patch("httpx.get", return_value=mock_response)
-
-    with pytest.raises(DataFetchError, match="Kraken API error"):
+    with pytest.raises(DataFetchError, match="Provider API error"):
         service.fetch_hourly_ohlcv(pair)
 
 

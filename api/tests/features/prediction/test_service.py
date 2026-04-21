@@ -165,25 +165,24 @@ def test_predict_model_not_loaded(mocker):
     request = PredictionRequest(pair="XXBTZUSD")
 
     # Mock successful data fetch and preprocessing
-    mock_kraken_payload = {
-        "error": [],
-        "result": {
-            "XXBTZUSD": [
-                [
-                    1711000000,
-                    "50000.0",
-                    "51000.0",
-                    "49000.0",
-                    "50500.0",
-                    "50200.0",
-                    "100.5",
-                    150,
-                ],
-            ]
-            * 200,
-            "last": 1711000000,
+    mock_kraken_payload = [
+        {
+            "timestamp": 1711000000,
+            "open": 1.0,
+            "high": 2.0,
+            "low": 0.5,
+            "close": 1.5,
+            "volume": 10.0,
         },
-    }
+        {
+            "timestamp": 1711003600,
+            "open": 1.5,
+            "high": 2.5,
+            "low": 1.0,
+            "close": 2.0,
+            "volume": 15.0,
+        }
+    ]
 
     mock_api_client = mocker.patch.object(service.api_client, "fetch_ohlcv_data")
     mock_api_client.return_value = mock_kraken_payload
@@ -219,25 +218,24 @@ def test_predict_feature_extraction_error(mocker):
     request = PredictionRequest(pair="XXBTZUSD")
 
     # Mock successful data fetch
-    mock_kraken_payload = {
-        "error": [],
-        "result": {
-            "XXBTZUSD": [
-                [
-                    1711000000,
-                    "50000.0",
-                    "51000.0",
-                    "49000.0",
-                    "50500.0",
-                    "50200.0",
-                    "100.5",
-                    150,
-                ],
-            ]
-            * 200,
-            "last": 1711000000,
+    mock_kraken_payload = [
+        {
+            "timestamp": 1711000000,
+            "open": 1.0,
+            "high": 2.0,
+            "low": 0.5,
+            "close": 1.5,
+            "volume": 10.0,
         },
-    }
+        {
+            "timestamp": 1711003600,
+            "open": 1.5,
+            "high": 2.5,
+            "low": 1.0,
+            "close": 2.0,
+            "volume": 15.0,
+        }
+    ]
 
     mock_api_client = mocker.patch.object(service.api_client, "fetch_ohlcv_data")
     mock_api_client.return_value = mock_kraken_payload
@@ -320,25 +318,24 @@ def test_predict_invalid_model_output_raises_data_validation_error(mocker):
     service = PredictionService()
     request = PredictionRequest(pair="XXBTZUSD")
 
-    mock_kraken_payload = {
-        "error": [],
-        "result": {
-            "XXBTZUSD": [
-                [
-                    1711000000,
-                    "50000.0",
-                    "51000.0",
-                    "49000.0",
-                    "50500.0",
-                    "50200.0",
-                    "100.5",
-                    150,
-                ],
-            ]
-            * 200,
-            "last": 1711000000,
+    mock_kraken_payload = [
+        {
+            "timestamp": 1711000000,
+            "open": 1.0,
+            "high": 2.0,
+            "low": 0.5,
+            "close": 1.5,
+            "volume": 10.0,
         },
-    }
+        {
+            "timestamp": 1711003600,
+            "open": 1.5,
+            "high": 2.5,
+            "low": 1.0,
+            "close": 2.0,
+            "volume": 15.0,
+        }
+    ]
 
     mocker.patch.object(
         service.api_client, "fetch_ohlcv_data", return_value=mock_kraken_payload

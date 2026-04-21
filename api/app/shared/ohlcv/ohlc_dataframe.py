@@ -23,30 +23,13 @@ class OHLCVDataFrame:
         self.df = dataframe
 
     @classmethod
-    def from_kraken_response(cls, payload: dict) -> "OHLCVDataFrame":
-        """Parse Kraken payload into normalized OHLCV DataFrame."""
+    def from_provider_response(cls, payload: list[dict[str, object]]) -> "OHLCVDataFrame":
+        """Parse provider payload into normalized OHLCV DataFrame.
+        Assumes payload is already mapped to dictionaries with keys:
+        'timestamp', 'open', 'high', 'low', 'close', 'volume'
+        """
         try:
-            result = payload["result"]
-            pair_key = next(key for key in result if key != "last")
-            raw_candles = result[pair_key]
-            last_completed_candle = result["last"]
-
-            df = pd.DataFrame(
-                raw_candles,
-                columns=[
-                    "timestamp",
-                    "open",
-                    "high",
-                    "low",
-                    "close",
-                    "vwap",
-                    "volume",
-                    "count",
-                ],
-            )
-
-            if not df.empty and last_completed_candle != df.iloc[-1]["timestamp"]:
-                df = df.iloc[:-1]
+            df = pd.DataFrame(payload)
 
             numeric_cols = ["open", "high", "low", "close", "volume"]
             df[numeric_cols] = df[numeric_cols].astype(float)
@@ -57,8 +40,8 @@ class OHLCVDataFrame:
 
             return cls(df)
 
-        except (KeyError, ValueError, TypeError, StopIteration) as error:
-            raise DataFetchError(f"Failed to parse Kraken response: {error}") from error
+        except (KeyError, ValueError, TypeError) as error:
+            raise DataFetchError(f"Failed to parse provider response: {error}") from error
 
     def to_records(self) -> list[dict[str, object]]:
         """Convert DataFrame rows into JSON-safe dictionaries."""

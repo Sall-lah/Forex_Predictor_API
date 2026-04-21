@@ -11,12 +11,12 @@ from app.core.exceptions import (
     DataValidationError,
     InsufficientDataError,
 )
-from app.shared.ohlcv import KrakenAPIClient, OHLCVDataFrame
+from app.shared.ohlcv import KrakenProvider, OHLCVDataFrame
 
 
 def test_fetch_ohlcv_data_maps_transport_failures_to_data_fetch_error(mocker) -> None:
     """Transport failures should map to a stable DataFetchError contract."""
-    client = KrakenAPIClient(base_url="https://api.kraken.test")
+    client = KrakenProvider(base_url="https://api.kraken.test")
     mocker.patch("httpx.get", side_effect=httpx.ConnectTimeout("timeout"))
 
     with pytest.raises(
@@ -25,10 +25,10 @@ def test_fetch_ohlcv_data_maps_transport_failures_to_data_fetch_error(mocker) ->
         client.fetch_ohlcv_data(pair="XXBTZUSD", count=24, interval=60)
 
 
-def test_from_kraken_response_parses_payload_and_drops_incomplete_latest_candle() -> (
+def test_from_provider_response_parses_payload_and_drops_incomplete_latest_candle() -> (
     None
 ):
-    """Parser should normalize OHLCV columns and drop incomplete tail row."""
+    """Provider should normalize OHLCV columns and drop incomplete tail row."""
     base_time = 1711000000
     payload = {
         "error": [],
@@ -59,7 +59,9 @@ def test_from_kraken_response_parses_payload_and_drops_incomplete_latest_candle(
         },
     }
 
-    parsed = OHLCVDataFrame.from_kraken_response(payload)
+    client = KrakenProvider(base_url="https://api.kraken.test")
+    preprocessed = client._preprocess_payload(payload, "XXBTZUSD")
+    parsed = OHLCVDataFrame.from_provider_response(preprocessed)
 
     assert list(parsed.df.columns) == [
         "timestamp",
