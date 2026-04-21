@@ -7,7 +7,7 @@ Provides type-safe, validated config with automatic .env file loading.
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict, PydanticBaseSettingsSource
 
 
 class Settings(BaseSettings):
@@ -65,11 +65,23 @@ class Settings(BaseSettings):
         """Compute canonical absolute path to the ML model file."""
         return (Path(self.MODEL_DIR) / self.MODEL_FILENAME).expanduser().resolve()
 
-    model_config = {
-        "env_file": ".env",
-        "env_file_encoding": "utf-8",
-        "case_sensitive": True,
-    }
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+    )
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        # Change loading order so config from .env overrides system env variables
+        return init_settings, dotenv_settings, env_settings, file_secret_settings
 
 
 @lru_cache
