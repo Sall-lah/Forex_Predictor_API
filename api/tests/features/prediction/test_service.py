@@ -21,8 +21,6 @@ from app.core.exceptions import (
     ModelNotLoadedError,
 )
 from app.features.prediction.schemas import PredictionRequest, PredictionResponse
-from app.features.historic_data.schemas import HistoricDataResponse, OHLCVRecord
-from app.features.historic_data.service import HistoricDataService
 from app.features.prediction.service import (
     PredictionService,
     OHLCVPreprocessor,
@@ -37,18 +35,30 @@ def test_predict_success(mocker):
     service = PredictionService()
 
     # Mock request
-    request = PredictionRequest(pair="BTC/USD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     # Mock Kraken API response
-    mock_kraken_payload = HistoricDataResponse(
-        symbol="BTC/USD",
-        total_records=200,
-        data=[
-            OHLCVRecord(timestamp="2026-04-21T06:00:00Z", open=50000.0, high=51000.0, low=49000.0, close=50500.0, volume=100.5)
-        ] * 200
-    )
+    mock_kraken_payload = {
+        "error": [],
+        "result": {
+            "XXBTZUSD": [
+                [
+                    1711000000,
+                    "50000.0",
+                    "51000.0",
+                    "49000.0",
+                    "50500.0",
+                    "50200.0",
+                    "100.5",
+                    150,
+                ],
+            ]
+            * 200,  # 200 rows to ensure enough data
+            "last": 1711000000,
+        },
+    }
 
-    mock_api_client = mocker.patch.object(service.historic_data_service, "get_live_data")
+    mock_api_client = mocker.patch.object(service.api_client, "fetch_ohlcv_data")
     mock_api_client.return_value = mock_kraken_payload
 
     # Mock preprocessor - return DataFrame with required features
@@ -79,7 +89,7 @@ def test_predict_success(mocker):
 
     # Assert
     assert isinstance(response, PredictionResponse)
-    assert response.pair == "BTC/USD"
+    assert response.pair == "XXBTZUSD"
     assert response.probability_up == 0.65
     assert response.probability_down == 0.25
     assert response.probability_straight == 0.10
@@ -94,10 +104,10 @@ def test_predict_kraken_api_error(mocker):
     """Test handling of Kraken API fetch error."""
     # Setup
     service = PredictionService()
-    request = PredictionRequest(pair="BTC/USD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     # Mock API client to raise error
-    mock_api_client = mocker.patch.object(service.historic_data_service, "get_live_data")
+    mock_api_client = mocker.patch.object(service.api_client, "fetch_ohlcv_data")
     mock_api_client.side_effect = DataFetchError("Kraken API unreachable")
 
     # Execute & Assert
@@ -111,18 +121,30 @@ def test_predict_insufficient_data(mocker):
     """Test handling of insufficient data for feature extraction."""
     # Setup
     service = PredictionService()
-    request = PredictionRequest(pair="BTC/USD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     # Mock Kraken API with minimal data
-    mock_kraken_payload = HistoricDataResponse(
-        symbol="BTC/USD",
-        total_records=10,
-        data=[
-            OHLCVRecord(timestamp="2026-04-21T06:00:00Z", open=50000.0, high=51000.0, low=49000.0, close=50500.0, volume=100.5)
-        ] * 10
-    )
+    mock_kraken_payload = {
+        "error": [],
+        "result": {
+            "XXBTZUSD": [
+                [
+                    1711000000,
+                    "50000.0",
+                    "51000.0",
+                    "49000.0",
+                    "50500.0",
+                    "50200.0",
+                    "100.5",
+                    150,
+                ],
+            ]
+            * 10,  # Only 10 rows - insufficient
+            "last": 1711000000,
+        },
+    }
 
-    mock_api_client = mocker.patch.object(service.historic_data_service, "get_live_data")
+    mock_api_client = mocker.patch.object(service.api_client, "fetch_ohlcv_data")
     mock_api_client.return_value = mock_kraken_payload
 
     # Preprocessor should raise InsufficientDataError
@@ -140,19 +162,29 @@ def test_predict_model_not_loaded(mocker):
     """Test handling of ML model loading failure."""
     # Setup
     service = PredictionService()
-    request = PredictionRequest(pair="BTC/USD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     # Mock successful data fetch and preprocessing
-    mock_kraken_payload = HistoricDataResponse(
-        symbol="BTC/USD",
-        total_records=2,
-        data=[
-            OHLCVRecord(timestamp="2026-04-21T06:00:00Z", open=1.0, high=2.0, low=0.5, close=1.5, volume=10.0),
-            OHLCVRecord(timestamp="2026-04-21T07:00:00Z", open=1.5, high=2.5, low=1.0, close=2.0, volume=15.0)
-        ]
-    )
+    mock_kraken_payload = [
+        {
+            "timestamp": 1711000000,
+            "open": 1.0,
+            "high": 2.0,
+            "low": 0.5,
+            "close": 1.5,
+            "volume": 10.0,
+        },
+        {
+            "timestamp": 1711003600,
+            "open": 1.5,
+            "high": 2.5,
+            "low": 1.0,
+            "close": 2.0,
+            "volume": 15.0,
+        }
+    ]
 
-    mock_api_client = mocker.patch.object(service.historic_data_service, "get_live_data")
+    mock_api_client = mocker.patch.object(service.api_client, "fetch_ohlcv_data")
     mock_api_client.return_value = mock_kraken_payload
 
     mock_features_df = pd.DataFrame(
@@ -183,19 +215,29 @@ def test_predict_feature_extraction_error(mocker):
     """Test handling of feature extraction errors."""
     # Setup
     service = PredictionService()
-    request = PredictionRequest(pair="BTC/USD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     # Mock successful data fetch
-    mock_kraken_payload = HistoricDataResponse(
-        symbol="BTC/USD",
-        total_records=2,
-        data=[
-            OHLCVRecord(timestamp="2026-04-21T06:00:00Z", open=1.0, high=2.0, low=0.5, close=1.5, volume=10.0),
-            OHLCVRecord(timestamp="2026-04-21T07:00:00Z", open=1.5, high=2.5, low=1.0, close=2.0, volume=15.0)
-        ]
-    )
+    mock_kraken_payload = [
+        {
+            "timestamp": 1711000000,
+            "open": 1.0,
+            "high": 2.0,
+            "low": 0.5,
+            "close": 1.5,
+            "volume": 10.0,
+        },
+        {
+            "timestamp": 1711003600,
+            "open": 1.5,
+            "high": 2.5,
+            "low": 1.0,
+            "close": 2.0,
+            "volume": 15.0,
+        }
+    ]
 
-    mock_api_client = mocker.patch.object(service.historic_data_service, "get_live_data")
+    mock_api_client = mocker.patch.object(service.api_client, "fetch_ohlcv_data")
     mock_api_client.return_value = mock_kraken_payload
 
     # Mock preprocessor to raise error
@@ -213,18 +255,30 @@ def test_predict_different_asset(mocker):
     """Test prediction for ETHUSD asset."""
     # Setup
     service = PredictionService()
-    request = PredictionRequest(pair="ETH/USD")
+    request = PredictionRequest(pair="XETHZUSD")
 
     # Mock all dependencies
-    mock_kraken_payload = HistoricDataResponse(
-        symbol="ETH/USD",
-        total_records=200,
-        data=[
-            OHLCVRecord(timestamp="2026-04-21T06:00:00Z", open=3000.0, high=3100.0, low=2900.0, close=3050.0, volume=500.5)
-        ] * 200
-    )
+    mock_kraken_payload = {
+        "error": [],
+        "result": {
+            "XETHZUSD": [
+                [
+                    1711000000,
+                    "3000.0",
+                    "3100.0",
+                    "2900.0",
+                    "3050.0",
+                    "3020.0",
+                    "500.5",
+                    250,
+                ],
+            ]
+            * 200,
+            "last": 1711000000,
+        },
+    }
 
-    mock_api_client = mocker.patch.object(service.historic_data_service, "get_live_data")
+    mock_api_client = mocker.patch.object(service.api_client, "fetch_ohlcv_data")
     mock_api_client.return_value = mock_kraken_payload
 
     mock_features_df = pd.DataFrame(
@@ -248,7 +302,7 @@ def test_predict_different_asset(mocker):
     response = service.predict(request)
 
     # Assert
-    assert response.pair == "ETH/USD"
+    assert response.pair == "XETHZUSD"
     assert response.probability_up == 0.45
     assert response.probability_down == 0.30
     assert response.probability_straight == 0.25
@@ -256,25 +310,35 @@ def test_predict_different_asset(mocker):
     # Verify preprocessor was called with correct asset
     mock_preprocessor.assert_called_once()
     call_args = mock_preprocessor.call_args
-    # assert call_args[0][1] == "ETH/USD"  # removed because extract_features takes 1 argument
+    assert call_args[0][1] == "ETHUSD"
 
 
 def test_predict_invalid_model_output_raises_data_validation_error(mocker):
     """Invalid predict_proba payloads should be surfaced as domain validation errors."""
     service = PredictionService()
-    request = PredictionRequest(pair="BTC/USD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
-    mock_kraken_payload = HistoricDataResponse(
-        symbol="BTC/USD",
-        total_records=2,
-        data=[
-            OHLCVRecord(timestamp="2026-04-21T06:00:00Z", open=1.0, high=2.0, low=0.5, close=1.5, volume=10.0),
-            OHLCVRecord(timestamp="2026-04-21T07:00:00Z", open=1.5, high=2.5, low=1.0, close=2.0, volume=15.0)
-        ]
-    )
+    mock_kraken_payload = [
+        {
+            "timestamp": 1711000000,
+            "open": 1.0,
+            "high": 2.0,
+            "low": 0.5,
+            "close": 1.5,
+            "volume": 10.0,
+        },
+        {
+            "timestamp": 1711003600,
+            "open": 1.5,
+            "high": 2.5,
+            "low": 1.0,
+            "close": 2.0,
+            "volume": 15.0,
+        }
+    ]
 
     mocker.patch.object(
-        service.historic_data_service, "get_live_data", return_value=mock_kraken_payload
+        service.api_client, "fetch_ohlcv_data", return_value=mock_kraken_payload
     )
     mocker.patch.object(
         service.preprocessor,
@@ -294,16 +358,18 @@ def test_predict_invalid_model_output_raises_data_validation_error(mocker):
 def test_predict_aligns_model_features_before_predict_proba(mocker):
     """Prediction input should be reordered to the model feature contract."""
     service = PredictionService()
-    request = PredictionRequest(pair="BTC/USD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     mocker.patch.object(
-        service.historic_data_service,
-        "get_live_data",
-        return_value=HistoricDataResponse(
-            symbol="BTC/USD",
-            total_records=200,
-            data=[OHLCVRecord(timestamp="2026-04-21T06:00:00Z", open=1.0, high=2.0, low=0.5, close=1.5, volume=1.0)] * 200
-        ),
+        service.api_client,
+        "fetch_ohlcv_data",
+        return_value={
+            "error": [],
+            "result": {
+                "XXBTZUSD": [[1711000000, "1", "1", "1", "1", "1", "1", 1]] * 200,
+                "last": 1711000000,
+            },
+        },
     )
     mocker.patch.object(
         service.preprocessor,
@@ -330,16 +396,18 @@ def test_predict_aligns_model_features_before_predict_proba(mocker):
 def test_predict_missing_model_required_feature_raises_data_validation_error(mocker):
     """Missing model-required columns should fail before inference."""
     service = PredictionService()
-    request = PredictionRequest(pair="BTC/USD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     mocker.patch.object(
-        service.historic_data_service,
-        "get_live_data",
-        return_value=HistoricDataResponse(
-            symbol="BTC/USD",
-            total_records=200,
-            data=[OHLCVRecord(timestamp="2026-04-21T06:00:00Z", open=1.0, high=2.0, low=0.5, close=1.5, volume=1.0)] * 200
-        ),
+        service.api_client,
+        "fetch_ohlcv_data",
+        return_value={
+            "error": [],
+            "result": {
+                "XXBTZUSD": [[1711000000, "1", "1", "1", "1", "1", "1", 1]] * 200,
+                "last": 1711000000,
+            },
+        },
     )
     mocker.patch.object(
         service.preprocessor,
@@ -359,16 +427,18 @@ def test_predict_missing_model_required_feature_raises_data_validation_error(moc
 def test_predict_with_inf_feature_raises_data_validation_error(mocker):
     """Aligned model features containing Inf/NaN should be rejected."""
     service = PredictionService()
-    request = PredictionRequest(pair="BTC/USD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     mocker.patch.object(
-        service.historic_data_service,
-        "get_live_data",
-        return_value=HistoricDataResponse(
-            symbol="BTC/USD",
-            total_records=200,
-            data=[OHLCVRecord(timestamp="2026-04-21T06:00:00Z", open=1.0, high=2.0, low=0.5, close=1.5, volume=1.0)] * 200
-        ),
+        service.api_client,
+        "fetch_ohlcv_data",
+        return_value={
+            "error": [],
+            "result": {
+                "XXBTZUSD": [[1711000000, "1", "1", "1", "1", "1", "1", 1]] * 200,
+                "last": 1711000000,
+            },
+        },
     )
     mocker.patch.object(
         service.preprocessor,
@@ -389,16 +459,28 @@ def test_predict_with_inf_feature_raises_data_validation_error(mocker):
 
 def test_predict_with_injected_mocks_orchestrates_dependencies():
     """PredictionService should orchestrate mocked boundaries deterministically."""
-    request = PredictionRequest(pair="BTC/USD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     mock_api_client = Mock()
-    mock_api_client.get_live_data.return_value = HistoricDataResponse(
-        symbol="BTC/USD",
-        total_records=200,
-        data=[
-            OHLCVRecord(timestamp="2026-04-21T06:00:00Z", open=50000.0, high=51000.0, low=49000.0, close=50500.0, volume=100.5)
-        ] * 200
-    )
+    mock_api_client.fetch_ohlcv_data.return_value = {
+        "error": [],
+        "result": {
+            "XXBTZUSD": [
+                [
+                    1711000000,
+                    "50000.0",
+                    "51000.0",
+                    "49000.0",
+                    "50500.0",
+                    "50200.0",
+                    "100.5",
+                    150,
+                ],
+            ]
+            * 200,
+            "last": 1711000000,
+        },
+    }
 
     mock_preprocessor = Mock(spec=OHLCVPreprocessor)
     mock_preprocessor.extract_features.return_value = pd.DataFrame(
@@ -416,7 +498,7 @@ def test_predict_with_injected_mocks_orchestrates_dependencies():
     mock_model_loader.get_model.return_value = mock_model
 
     service = PredictionService(
-        historic_data_service=mock_api_client,
+        api_client=mock_api_client,
         preprocessor=mock_preprocessor,
         model_loader=mock_model_loader,
     )
@@ -424,12 +506,12 @@ def test_predict_with_injected_mocks_orchestrates_dependencies():
     response = service.predict(request)
 
     assert isinstance(response, PredictionResponse)
-    assert response.pair == "BTC/USD"
+    assert response.pair == "XXBTZUSD"
     assert response.probability_up == 0.8
     assert response.probability_down == 0.0
     assert response.probability_straight == 0.2
 
-    mock_api_client.get_live_data.assert_called_once()
+    mock_api_client.fetch_ohlcv_data.assert_called_once()
     mock_preprocessor.extract_features.assert_called_once()
     mock_model_loader.get_model.assert_called_once()
     mock_model.predict_proba.assert_called_once()
@@ -439,10 +521,10 @@ def test_model_loader_missing_file_includes_resolved_path_in_error(monkeypatch):
     """Missing model artifacts should report the resolved path clearly."""
     model_dir = Path("tests/tmp/nonexistent-model-dir")
     model_filename = "missing-model.pkl"
-    
+    expected_path = (model_dir / model_filename).resolve()
+
     monkeypatch.setattr(settings, "MODEL_DIR", str(model_dir))
     monkeypatch.setattr(settings, "MODEL_FILENAME", model_filename)
-    expected_path = settings.model_path
 
     with pytest.raises(ModelNotLoadedError) as exc_info:
         ModelLoader._load_model()
@@ -499,16 +581,18 @@ def test_model_loader_get_model_returns_loaded_model(monkeypatch, tmp_path):
 def test_predict_missing_model_file_reports_resolved_path(mocker, monkeypatch):
     """PredictionService should surface resolved-path context for missing artifacts."""
     service = PredictionService()
-    request = PredictionRequest(pair="BTC/USD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     mocker.patch.object(
-        service.historic_data_service,
-        "get_live_data",
-        return_value=HistoricDataResponse(
-            symbol="BTC/USD",
-            total_records=200,
-            data=[OHLCVRecord(timestamp="2026-04-21T06:00:00Z", open=1.0, high=2.0, low=0.5, close=1.5, volume=1.0)] * 200
-        ),
+        service.api_client,
+        "fetch_ohlcv_data",
+        return_value={
+            "error": [],
+            "result": {
+                "XXBTZUSD": [[1711000000, "1", "1", "1", "1", "1", "1", 1]] * 200,
+                "last": 1711000000,
+            },
+        },
     )
     mocker.patch.object(
         service.preprocessor,
@@ -518,9 +602,9 @@ def test_predict_missing_model_file_reports_resolved_path(mocker, monkeypatch):
 
     model_dir = Path("tests/tmp/missing-model")
     model_filename = "missing-from-service.pkl"
+    expected_path = (model_dir / model_filename).resolve()
     monkeypatch.setattr(settings, "MODEL_DIR", str(model_dir))
     monkeypatch.setattr(settings, "MODEL_FILENAME", model_filename)
-    expected_path = settings.model_path
 
     service.model_loader.clear_cache()
 
@@ -537,16 +621,18 @@ def test_predict_invalid_model_without_predict_proba_raises_model_not_loaded_err
 ):
     """PredictionService should reject loaded artifacts lacking predict_proba."""
     service = PredictionService()
-    request = PredictionRequest(pair="BTC/USD")
+    request = PredictionRequest(pair="XXBTZUSD")
 
     mocker.patch.object(
-        service.historic_data_service,
-        "get_live_data",
-        return_value=HistoricDataResponse(
-            symbol="BTC/USD",
-            total_records=200,
-            data=[OHLCVRecord(timestamp="2026-04-21T06:00:00Z", open=1.0, high=2.0, low=0.5, close=1.5, volume=1.0)] * 200
-        ),
+        service.api_client,
+        "fetch_ohlcv_data",
+        return_value={
+            "error": [],
+            "result": {
+                "XXBTZUSD": [[1711000000, "1", "1", "1", "1", "1", "1", 1]] * 200,
+                "last": 1711000000,
+            },
+        },
     )
     mocker.patch.object(
         service.preprocessor,

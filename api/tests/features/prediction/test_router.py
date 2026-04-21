@@ -24,7 +24,7 @@ from app.features.prediction.schemas import PredictionResponse
 def test_prediction_response_success_with_probabilities() -> None:
     """Test PredictionResponse accepts canonical probability fields."""
     response = PredictionResponse(
-        pair="BTC/USD",
+        pair="XXBTZUSD",
         probability_up=0.72,
         probability_down=0.18,
         probability_straight=0.10,
@@ -38,14 +38,14 @@ def test_prediction_response_success_with_probabilities() -> None:
 def test_prediction_response_success_serialization_contract_fields() -> None:
     """Test PredictionResponse serializes canonical response contract keys only."""
     payload = PredictionResponse(
-        pair="BTC/USD",
+        pair="XXBTZUSD",
         probability_up=0.72,
         probability_down=0.18,
         probability_straight=0.10,
     ).model_dump()
 
     assert payload == {
-        "pair": "BTC/USD",
+        "pair": "XXBTZUSD",
         "probability_up": 0.72,
         "probability_down": 0.18,
         "probability_straight": 0.10,
@@ -56,7 +56,7 @@ def test_predict_endpoint_success(client, mocker):
     """Test successful prediction via API endpoint."""
     # Mock the service's predict method
     mock_response = PredictionResponse(
-        pair="BTC/USD",
+        pair="XXBTZUSD",
         probability_up=0.72,
         probability_down=0.18,
         probability_straight=0.10,
@@ -73,7 +73,7 @@ def test_predict_endpoint_success(client, mocker):
     response = client.post(
         "/api/v1/prediction/predict",
         json={
-            "pair": "BTC/USD",
+            "pair": "XXBTZUSD",
         },
     )
 
@@ -86,7 +86,7 @@ def test_predict_endpoint_success(client, mocker):
         "probability_down",
         "probability_straight",
     }
-    assert data["pair"] == "BTC/USD"
+    assert data["pair"] == "XXBTZUSD"
     assert data["probability_up"] == 0.72
     assert data["probability_down"] == 0.18
     assert data["probability_straight"] == 0.10
@@ -96,7 +96,7 @@ def test_predict_endpoint_ethusd(client, mocker):
     """Test prediction for ETHUSD asset."""
     # Mock the service
     mock_response = PredictionResponse(
-        pair="ETH/USD",
+        pair="XETHZUSD",
         probability_up=0.58,
         probability_down=0.32,
         probability_straight=0.10,
@@ -112,7 +112,7 @@ def test_predict_endpoint_ethusd(client, mocker):
     response = client.post(
         "/api/v1/prediction/predict",
         json={
-            "pair": "ETH/USD",
+            "pair": "XETHZUSD",
         },
     )
 
@@ -132,11 +132,11 @@ def test_predict_endpoint_ethusd(client, mocker):
 
 def test_predict_endpoint_invalid_asset(client):
     """Test validation error for invalid asset name."""
-    # Make request with invalid asset (empty string fails min_length=1)
+    # Make request with invalid asset
     response = client.post(
         "/api/v1/prediction/predict",
         json={
-            "pair": "",
+            "pair": "XXBTZUSD",
         },
     )
 
@@ -188,7 +188,7 @@ def test_predict_endpoint_data_fetch_error(client, mocker):
     response = client.post(
         "/api/v1/prediction/predict",
         json={
-            "pair": "BTC/USD",
+            "pair": "XXBTZUSD",
         },
     )
 
@@ -213,7 +213,7 @@ def test_predict_endpoint_insufficient_data_error(client, mocker):
     response = client.post(
         "/api/v1/prediction/predict",
         json={
-            "pair": "BTC/USD",
+            "pair": "XXBTZUSD",
         },
     )
 
@@ -238,7 +238,7 @@ def test_predict_endpoint_model_not_loaded_error(client, mocker):
     response = client.post(
         "/api/v1/prediction/predict",
         json={
-            "pair": "BTC/USD",
+            "pair": "XXBTZUSD",
         },
     )
 
@@ -267,14 +267,14 @@ def test_predict_endpoint_probability_range(client, mocker):
 
     # Test with 0.0
     mock_service_instance.predict.return_value = PredictionResponse(
-        pair="BTC/USD",
+        pair="XXBTZUSD",
         probability_up=0.0,
         probability_down=1.0,
         probability_straight=0.0,
     )
 
     response = client.post(
-        "/api/v1/prediction/predict", json={"pair": "BTC/USD"}
+        "/api/v1/prediction/predict", json={"pair": "XXBTZUSD"}
     )
 
     assert response.status_code == 200
@@ -284,14 +284,14 @@ def test_predict_endpoint_probability_range(client, mocker):
 
     # Test with 1.0
     mock_service_instance.predict.return_value = PredictionResponse(
-        pair="BTC/USD",
+        pair="XXBTZUSD",
         probability_up=1.0,
         probability_down=0.0,
         probability_straight=0.0,
     )
 
     response = client.post(
-        "/api/v1/prediction/predict", json={"pair": "BTC/USD"}
+        "/api/v1/prediction/predict", json={"pair": "XXBTZUSD"}
     )
 
     assert response.status_code == 200

@@ -32,8 +32,7 @@ from app.core.exceptions import (
 )
 from app.shared.ohlcv import OHLCVDataFrame
 from app.features.prediction.schemas import PredictionRequest, PredictionResponse
-from app.features.historic_data.service import HistoricDataService
-from app.features.historic_data.schemas import HistoricDataRequest
+from app.shared.ohlcv import OHLCVDataFrame, DataProvider, get_provider
 
 logger = logging.getLogger(__name__)
 
@@ -434,12 +433,12 @@ class PredictionService:
 
     def __init__(
         self,
-        historic_data_service: HistoricDataService | None = None,
+        api_client: DataProvider | None = None,
         model_loader: ModelLoader | None = None,
         preprocessor: OHLCVPreprocessor | None = None,
     ) -> None:
         """Inject dependencies or instantiate defaults."""
-        self.historic_data_service = historic_data_service or HistoricDataService()
+        self.api_client = api_client or get_provider()
         self.model_loader = model_loader or ModelLoader()
         self.preprocessor = preprocessor or OHLCVPreprocessor()
 
@@ -483,24 +482,17 @@ class PredictionService:
     def _fetch_historic_dataframe(self, request: PredictionRequest) -> pd.DataFrame:
         """Fetch and parse provider OHLCV payload into a DataFrame."""
         logger.info("Fetching OHLCV data for '%s'", request.pair)
-        
-        historic_req = HistoricDataRequest(
-            pair=request.pair,
-            count=200,
-            interval=60
+        payload = self.api_client.fetch_ohlcv_data(
+            request.pair, count=180, interval=60
         )
-        response = self.historic_data_service.get_live_data(historic_req)
-        
-        # Convert list of OHLCVRecord objects to pandas DataFrame
-        records = [record.model_dump() for record in response.data]
-        df = pd.DataFrame(records)
+        ohlcv_data = OHLCVDataFrame.from_provider_response(payload)
 
         logger.info(
             "Fetched %d candles for '%s' (interval: 60m)",
-            len(df),
+            len(ohlcv_data.df),
             request.pair,
         )
-        return df
+        return ohlcv_data.df
 
     def _extract_features(
         self, historic_df: pd.DataFrame, request: PredictionRequest

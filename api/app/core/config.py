@@ -61,15 +61,8 @@ class Settings(BaseSettings):
 
     @property
     def model_path(self) -> Path:
-        """Resolve full model path from configured dir and filename."""
-        base_dir = Path(__file__).parent.parent.parent  # Resolves to api/
-        model_dir_path = Path(self.MODEL_DIR)
-        
-        # If MODEL_DIR is relative (like app/features/...), resolve it relative to api/
-        if not model_dir_path.is_absolute():
-            return (base_dir / model_dir_path / self.MODEL_FILENAME).expanduser().resolve()
-            
-        return (model_dir_path / self.MODEL_FILENAME).expanduser().resolve()
+        """Compute canonical absolute path to the ML model file."""
+        return (Path(self.MODEL_DIR) / self.MODEL_FILENAME).expanduser().resolve()
 
     model_config = SettingsConfigDict(
         env_file=".env",
