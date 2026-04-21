@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     API_VERSION: str = "v1"
     API_PREFIX: str = "/api/v1"
 
+    # Data Provider settings
+    DATA_PROVIDER: str = "kraken"
+
     # Kraken API settings
     KRAKEN_OHLC_URL: str = "https://api.kraken.com/0/public/OHLC"
     KRAKEN_TIMEOUT: float = 15.0

@@ -2,8 +2,9 @@
 
 import logging
 
-from app.core.config import get_settings
-from app.shared.ohlcv import KrakenProvider, OHLCVDataFrame
+from app.core.exceptions import DataFetchError, DataValidationError, InsufficientDataError
+from app.features.historic_data.schemas import HistoricDataRequest, HistoricDataResponse
+from app.shared.ohlcv import OHLCVDataFrame, DataProvider, get_provider
 
 logger = logging.getLogger(__name__)
 
@@ -11,9 +12,9 @@ logger = logging.getLogger(__name__)
 class HistoricDataService:
     """Coordinates Historic Data workflows."""
 
-    def __init__(self, api_client: KrakenProvider | None = None) -> None:
+    def __init__(self, api_client: DataProvider | None = None) -> None:
         """Inject dependencies or instantiate defaults."""
-        self.api_client = api_client or KrakenProvider()
+        self.api_client = api_client or get_provider()
 
     def get_live_data(
         self, request: HistoricDataRequest

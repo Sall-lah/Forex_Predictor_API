@@ -30,7 +30,7 @@ from app.core.exceptions import (
 )
 from app.shared.ohlcv import KrakenAPIClient, OHLCVDataFrame
 from app.features.prediction.schemas import PredictionRequest, PredictionResponse
-from app.shared.ohlcv import KrakenProvider, OHLCVDataFrame
+from app.shared.ohlcv import OHLCVDataFrame, DataProvider, get_provider
 
 logger = logging.getLogger(__name__)
 
@@ -431,11 +431,11 @@ class PredictionService:
 
     def __init__(
         self,
-        api_client: KrakenProvider | None = None,
+        api_client: DataProvider | None = None,
         model_loader: ModelLoader | None = None,
     ) -> None:
         """Inject dependencies or instantiate defaults."""
-        self.api_client = api_client or KrakenProvider()
+        self.api_client = api_client or get_provider()
         self.model_loader = model_loader or ModelLoader()
 
     def predict(self, request: PredictionRequest) -> PredictionResponse:
