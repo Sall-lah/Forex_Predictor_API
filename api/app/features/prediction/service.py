@@ -483,7 +483,7 @@ class PredictionService:
         """Fetch and parse provider OHLCV payload into a DataFrame."""
         logger.info("Fetching OHLCV data for '%s'", request.pair)
         payload = self.api_client.fetch_ohlcv_data(
-            request.pair, count=168, interval=60
+            request.pair, count=180, interval=60
         )
         ohlcv_data = OHLCVDataFrame.from_provider_response(payload)
 

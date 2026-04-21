@@ -32,7 +32,6 @@ class Settings(BaseSettings):
     # Kraken API settings
     KRAKEN_OHLC_URL: str = "https://api.kraken.com/0/public/OHLC"
     KRAKEN_TIMEOUT: float = 15.0
-    KRAKEN_DEFAULT_CANDLES: int = 720
 
     # ML Model settings
     MODEL_DIR: str = "app/features/prediction/ml_models"

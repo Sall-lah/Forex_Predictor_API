@@ -2,8 +2,8 @@
 
 import logging
 
-from app.core.exceptions import DataFetchError, DataValidationError, InsufficientDataError
-from app.features.historic_data.schemas import HistoricDataRequest, HistoricDataResponse
+# from app.core.exceptions import DataFetchError, DataValidationError, InsufficientDataError
+from app.features.historic_data.schemas import HistoricDataRequest, HistoricDataResponse, OHLCVRecord
 from app.shared.ohlcv import OHLCVDataFrame, DataProvider, get_provider
 
 logger = logging.getLogger(__name__)
@@ -34,14 +34,14 @@ class HistoricDataService:
         records = [OHLCVRecord(**row) for row in ohlcv_data.to_records()]
 
         logger.info(
-            "Fetched Kraken data for '%s' — %d candles (interval: %dm)",
-            pair,
+            "Fetched data for '%s' — %d candles (interval: %dm)",
+            request.pair,
             len(records),
-            interval,
+            request.interval,
         )
 
         return HistoricDataResponse(
-            symbol=pair,
+            symbol=request.pair,
             total_records=len(records),
             data=records,
         )

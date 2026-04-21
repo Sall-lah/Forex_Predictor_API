@@ -7,7 +7,7 @@ Endpoints:
 
 from fastapi import APIRouter, Depends, Query
 
-from app.features.historic_data.schemas import HistoricDataResponse
+from app.features.historic_data.schemas import HistoricDataRequest, HistoricDataResponse
 from app.features.historic_data.service import HistoricDataService
 
 router = APIRouter()
@@ -35,13 +35,17 @@ def get_service() -> HistoricDataService:
 async def get_live_data(
     pair: str = Query(
         ...,
-        description="Kraken trading pair (e.g., 'BTC/UDS', 'ETH/USD')",
+        description="Data trading pair (e.g., 'BTC/USD', 'ETH/USD')",
         examples=["BTC/USD"],
     ),
     interval: int = Query(
-        1,
+        60,
         description="Time frame interval in minutes",
         enum=[1, 5, 15, 30, 60, 240, 1440, 10080, 21600],
+    ),
+    count: int = Query(
+        180,
+        description="Number of OHLCV records to fetch",
     ),
     service: HistoricDataService = Depends(get_service),
 ) -> HistoricDataResponse:
@@ -56,4 +60,5 @@ async def get_live_data(
     Returns:
         Response with OHLCV records
     """
-    return service.fetch_hourly_ohlcv(pair, interval=interval)
+    request = HistoricDataRequest(pair=pair, interval=interval, count=count)
+    return service.get_live_data(request)
