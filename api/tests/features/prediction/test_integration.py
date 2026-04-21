@@ -48,7 +48,7 @@ def test_predict_btcusd_live():
 
     # Assert
     assert response.pair == "BTC/USD"
-        assert 0.0 <= response.probability_up <= 1.0
+    assert 0.0 <= response.probability_up <= 1.0
     assert 0.0 <= response.probability_down <= 1.0
     assert 0.0 <= response.probability_straight <= 1.0
 
@@ -81,7 +81,7 @@ def test_predict_ethusd_live():
 
     # Assert
     assert response.pair == "ETH/USD"
-        assert 0.0 <= response.probability_up <= 1.0
+    assert 0.0 <= response.probability_up <= 1.0
     assert 0.0 <= response.probability_down <= 1.0
     assert 0.0 <= response.probability_straight <= 1.0
 
@@ -118,7 +118,7 @@ def test_predict_via_api_btcusd_live(client):
     data = response.json()
 
     assert data["pair"] == "BTC/USD"
-        assert "probability_up" in data
+    assert "probability_up" in data
     assert "probability_down" in data
     assert "probability_straight" in data
     assert 0.0 <= data["probability_up"] <= 1.0
@@ -151,7 +151,7 @@ def test_predict_via_api_ethusd_live(client):
     data = response.json()
 
     assert data["pair"] == "ETH/USD"
-        assert 0.0 <= data["probability_up"] <= 1.0
+    assert 0.0 <= data["probability_up"] <= 1.0
     assert 0.0 <= data["probability_down"] <= 1.0
     assert 0.0 <= data["probability_straight"] <= 1.0
 

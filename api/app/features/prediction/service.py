@@ -23,6 +23,8 @@ import pandas as pd
 from ta import momentum, trend, volatility
 
 from app.core.config import get_settings
+
+settings = get_settings()
 from app.core.exceptions import (
     DataValidationError,
     InsufficientDataError,
@@ -433,10 +435,12 @@ class PredictionService:
         self,
         api_client: DataProvider | None = None,
         model_loader: ModelLoader | None = None,
+        preprocessor: OHLCVPreprocessor | None = None,
     ) -> None:
         """Inject dependencies or instantiate defaults."""
         self.api_client = api_client or get_provider()
         self.model_loader = model_loader or ModelLoader()
+        self.preprocessor = preprocessor or OHLCVPreprocessor()
 
     def predict(self, request: PredictionRequest) -> PredictionResponse:
         """
@@ -479,7 +483,7 @@ class PredictionService:
         """Fetch and parse provider OHLCV payload into a DataFrame."""
         logger.info("Fetching OHLCV data for '%s'", request.pair)
         payload = self.api_client.fetch_ohlcv_data(
-            request.pair, count=settings.PREDICTION_FETCH_CANDLES, interval=60
+            request.pair, count=168, interval=60
         )
         ohlcv_data = OHLCVDataFrame.from_provider_response(payload)
 

@@ -87,7 +87,7 @@ def test_predict_endpoint_success(client, mocker):
         "probability_straight",
     }
     assert data["pair"] == "XXBTZUSD"
-        assert data["probability_up"] == 0.72
+    assert data["probability_up"] == 0.72
     assert data["probability_down"] == 0.18
     assert data["probability_straight"] == 0.10
 
@@ -125,7 +125,7 @@ def test_predict_endpoint_ethusd(client, mocker):
         "probability_down",
         "probability_straight",
     }
-        assert data["probability_up"] == 0.58
+    assert data["probability_up"] == 0.58
     assert data["probability_down"] == 0.32
     assert data["probability_straight"] == 0.10
 

@@ -90,7 +90,7 @@ def test_predict_success(mocker):
     # Assert
     assert isinstance(response, PredictionResponse)
     assert response.pair == "XXBTZUSD"
-        assert response.probability_up == 0.65
+    assert response.probability_up == 0.65
     assert response.probability_down == 0.25
     assert response.probability_straight == 0.10
 
@@ -303,7 +303,7 @@ def test_predict_different_asset(mocker):
 
     # Assert
     assert response.pair == "XETHZUSD"
-        assert response.probability_up == 0.45
+    assert response.probability_up == 0.45
     assert response.probability_down == 0.30
     assert response.probability_straight == 0.25
 
@@ -507,7 +507,7 @@ def test_predict_with_injected_mocks_orchestrates_dependencies():
 
     assert isinstance(response, PredictionResponse)
     assert response.pair == "XXBTZUSD"
-        assert response.probability_up == 0.8
+    assert response.probability_up == 0.8
     assert response.probability_down == 0.0
     assert response.probability_straight == 0.2
 
