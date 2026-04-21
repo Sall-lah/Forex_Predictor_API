@@ -52,6 +52,27 @@ class OHLCVRecord(BaseModel):
     )
 
 
+class HistoricDataRequest(BaseModel):
+    """
+    Request model for historic data.
+    """
+    pair: str = Field(
+        ...,
+        description="Trading pair symbol",
+        examples=["EURUSD", "XXBTZUSD"],
+    )
+    count: int = Field(
+        720,
+        description="Number of periods to fetch",
+        gt=0,
+    )
+    interval: int = Field(
+        60,
+        description="Candle interval in minutes",
+        gt=0,
+    )
+
+
 class HistoricDataResponse(BaseModel):
     """
     Response containing historic OHLCV data.
