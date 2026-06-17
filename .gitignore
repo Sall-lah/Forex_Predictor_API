@@ -7,5 +7,10 @@ CLAUDE.md
 .coverage
 openspec
 graphify-out
+.claude
+.opencode
+.planning
+.playwright
+.playwright-cli
 # app/features/prediction/ml_models/MODEL_USAGE.md
 # app/features/prediction/ml_models/OHLCV_PREPROCESS.md
