@@ -6,6 +6,8 @@ import httpx
 import pandas as pd
 import pytest
 
+pytestmark = pytest.mark.asyncio
+
 from app.core.exceptions import (
     DataFetchError,
     DataValidationError,
@@ -14,15 +16,43 @@ from app.core.exceptions import (
 from app.shared.ohlcv import KrakenProvider, OHLCVDataFrame
 
 
-def test_fetch_ohlcv_data_maps_transport_failures_to_data_fetch_error(mocker) -> None:
+async def test_fetch_ohlcv_data_maps_transport_failures_to_data_fetch_error(mocker) -> None:
     """Transport failures should map to a stable DataFetchError contract."""
     client = KrakenProvider(base_url="https://api.kraken.test")
-    mocker.patch("httpx.get", side_effect=httpx.ConnectTimeout("timeout"))
+    
+    mock_client = mocker.AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.get.side_effect = httpx.ConnectTimeout("timeout")
+    mocker.patch("httpx.AsyncClient", return_value=mock_client)
 
     with pytest.raises(
         DataFetchError, match="Network error while fetching Kraken data"
     ):
-        client.fetch_ohlcv_data(pair="XXBTZUSD", count=24, interval=60)
+        await client.fetch_ohlcv_data(pair="XXBTZUSD", count=24, interval=60)
+
+async def test_fetch_ohlcv_data_query_params(mocker) -> None:
+    """Ensure count is not in query params and since covers 720 candles."""
+    client = KrakenProvider(base_url="https://api.kraken.test")
+    
+    mock_response = mocker.Mock()
+    mock_response.json.return_value = {"error": [], "result": {"XXBTZUSD": [], "last": 0}}
+    
+    mock_client = mocker.AsyncMock()
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.get.return_value = mock_response
+    mocker.patch("httpx.AsyncClient", return_value=mock_client)
+
+    await client.fetch_ohlcv_data(pair="XXBTZUSD", count=24, interval=60)
+    
+    call_kwargs = mock_client.get.call_args.kwargs
+    params = call_kwargs["params"]
+    
+    assert "count" not in params
+    assert params["interval"] == 60
+    
+    now = pd.Timestamp.now(tz="UTC").floor("h")
+    expected_since = int(now.timestamp() - (720 * 60 * 60))
+    assert params["since"] == expected_since
 
 
 def test_from_provider_response_parses_payload_and_drops_incomplete_latest_candle() -> (
@@ -62,6 +92,11 @@ def test_from_provider_response_parses_payload_and_drops_incomplete_latest_candl
     client = KrakenProvider(base_url="https://api.kraken.test")
     preprocessed = client._preprocess_payload(payload, "XXBTZUSD")
     parsed = OHLCVDataFrame.from_provider_response(preprocessed)
+
+    # 1st candle has timestamp 1711000000. 
+    # last_completed_candle is 1711000000, which means the 2nd candle (1711003600) is incomplete.
+    # Actually wait: "last" field in payload is base_time. The last candle has base_time + 3600.
+    # The provider drops the last candle because its timestamp doesn't match 'last'.
 
     assert list(parsed.df.columns) == [
         "timestamp",

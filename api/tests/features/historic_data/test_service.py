@@ -1,3 +1,5 @@
+import pytest
+pytestmark = pytest.mark.asyncio
 """
 Tests for the HistoricDataService class.
 
@@ -19,7 +21,7 @@ from app.shared.ohlcv import OHLCVDataFrame
 from app.features.historic_data.service import HistoricDataService
 
 
-def test_fetch_hourly_ohlcv_success(mocker):
+async def test_fetch_hourly_ohlcv_success(mocker):
     """
     Simulates a successful Kraken API response. Validate that the service
     correctly parses the nested JSON, creates a DataFrame, and returns
@@ -53,7 +55,9 @@ def test_fetch_hourly_ohlcv_success(mocker):
     # to test the service boundary
     mocker.patch.object(service.api_client, "fetch_ohlcv_data", return_value=mock_payload)
 
-    response = service.fetch_hourly_ohlcv(pair)
+    from app.features.historic_data.schemas import HistoricDataRequest
+    request = HistoricDataRequest(pair=pair, count=168, interval=60)
+    response = await service.get_live_data(request)
 
     # Assert basic response structure
     assert response.symbol == pair
@@ -78,7 +82,7 @@ def test_fetch_hourly_ohlcv_success(mocker):
     assert last_record.volume >= 0
 
 
-def test_fetch_hourly_ohlcv_api_error(mocker):
+async def test_fetch_hourly_ohlcv_api_error(mocker):
     """
     Simulates provider responding with an error.
     """
@@ -92,59 +96,51 @@ def test_fetch_hourly_ohlcv_api_error(mocker):
     )
 
     with pytest.raises(DataFetchError, match="Provider API error"):
-        service.fetch_hourly_ohlcv(pair)
+        from app.features.historic_data.schemas import HistoricDataRequest
+        await service.get_live_data(HistoricDataRequest(pair=pair))
 
 
-def test_fetch_hourly_ohlcv_http_error_raises_domain_message(mocker):
+async def test_fetch_hourly_ohlcv_http_error_raises_domain_message(mocker):
     """Ensure transport failures are mapped to a clear DataFetchError contract."""
     service = HistoricDataService()
 
-    mocker.patch("httpx.get", side_effect=httpx.ConnectTimeout("timeout"))
+    mocker.patch("httpx.AsyncClient.get", side_effect=httpx.ConnectTimeout("timeout"))
 
     with pytest.raises(
         DataFetchError, match="Network error while fetching Kraken data"
     ):
-        service.fetch_hourly_ohlcv("XXBTZUSD")
+        from app.features.historic_data.schemas import HistoricDataRequest
+        await service.get_live_data(HistoricDataRequest(pair="XXBTZUSD"))
 
 
-def test_fetch_hourly_ohlcv_with_mocked_client_returns_contract_shape():
+async def test_fetch_hourly_ohlcv_with_mocked_client_returns_contract_shape(mocker):
     """Service should format records from injected client payload deterministically."""
     pair = "XXBTZUSD"
     base_time = 1711000000
-    mocked_payload = {
-        "error": [],
-        "result": {
-            pair: [
-                [
-                    base_time,
-                    "50000.0",
-                    "51000.0",
-                    "49000.0",
-                    "50500.0",
-                    "50200.0",
-                    "100.5",
-                    150,
-                ],
-                [
-                    base_time + 3600,
-                    "50500.0",
-                    "51500.0",
-                    "49500.0",
-                    "51000.0",
-                    "50750.0",
-                    "120.0",
-                    170,
-                ],
-            ],
-            "last": base_time + 3600,
+    mocked_client = mocker.AsyncMock()
+    mocked_client.fetch_ohlcv_data.return_value = [
+        {
+            "timestamp": base_time,
+            "open": 50000.0,
+            "high": 51000.0,
+            "low": 49000.0,
+            "close": 50500.0,
+            "volume": 150.0,
         },
-    }
-
-    mocked_client = Mock()
-    mocked_client.fetch_ohlcv_data.return_value = mocked_payload
+        {
+            "timestamp": base_time + 3600,
+            "open": 50500.0,
+            "high": 51500.0,
+            "low": 49500.0,
+            "close": 51000.0,
+            "volume": 170.0,
+        },
+    ]
     service = HistoricDataService(api_client=mocked_client)
 
-    response = service.fetch_hourly_ohlcv(pair)
+    from app.features.historic_data.schemas import HistoricDataRequest
+    request = HistoricDataRequest(pair=pair, count=168, interval=60)
+    response = await service.get_live_data(request)
 
     mocked_client.fetch_ohlcv_data.assert_called_once()
     assert response.symbol == pair
@@ -154,7 +150,7 @@ def test_fetch_hourly_ohlcv_with_mocked_client_returns_contract_shape():
     assert response.data[1].close == 51000.0
 
 
-def test_ohlcv_dataframe_validate_required_columns():
+async def test_ohlcv_dataframe_validate_required_columns():
     """Required-column validation should fail with domain exception."""
     df = pd.DataFrame(
         {
@@ -171,7 +167,7 @@ def test_ohlcv_dataframe_validate_required_columns():
         OHLCVDataFrame(df).validate_columns()
 
 
-def test_ohlcv_dataframe_validate_minimum_rows():
+async def test_ohlcv_dataframe_validate_minimum_rows():
     """Row-count validation should enforce minimum size constraints."""
     df = pd.DataFrame(
         {

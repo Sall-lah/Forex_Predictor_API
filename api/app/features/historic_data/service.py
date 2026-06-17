@@ -16,13 +16,13 @@ class HistoricDataService:
         """Inject dependencies or instantiate defaults."""
         self.api_client = api_client or get_provider()
 
-    def get_live_data(
+    async def get_live_data(
         self, request: HistoricDataRequest
     ) -> HistoricDataResponse:
         """Fetch, normalize, and return recent OHLCV data."""
         logger.info(f"Fetching {request.count} periods for {request.pair}")
 
-        payload = self.api_client.fetch_ohlcv_data(
+        payload = await self.api_client.fetch_ohlcv_data(
             pair=request.pair,
             count=request.count,
             interval=request.interval,

@@ -1,8 +1,11 @@
 node_modules
+.agent
 .agents
 .env
 AGENTS.md
 CLAUDE.md
 .coverage
+openspec
+graphify-out
 # app/features/prediction/ml_models/MODEL_USAGE.md
 # app/features/prediction/ml_models/OHLCV_PREPROCESS.md

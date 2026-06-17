@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 """
 Unit tests for prediction router endpoints.
 
@@ -28,6 +29,8 @@ def test_prediction_response_success_with_probabilities() -> None:
         probability_up=0.72,
         probability_down=0.18,
         probability_straight=0.10,
+        computed_at=datetime.now(timezone.utc),
+        valid_until=datetime.now(timezone.utc)
     )
 
     assert response.probability_up == 0.72
@@ -42,9 +45,11 @@ def test_prediction_response_success_serialization_contract_fields() -> None:
         probability_up=0.72,
         probability_down=0.18,
         probability_straight=0.10,
+        computed_at=datetime.now(timezone.utc),
+        valid_until=datetime.now(timezone.utc)
     ).model_dump()
 
-    assert payload == {
+    assert {k: v for k, v in payload.items() if k not in ["computed_at", "valid_until"]} == {
         "pair": "XXBTZUSD",
         "probability_up": 0.72,
         "probability_down": 0.18,
@@ -60,6 +65,8 @@ def test_predict_endpoint_success(client, mocker):
         probability_up=0.72,
         probability_down=0.18,
         probability_straight=0.10,
+        computed_at=datetime.now(timezone.utc),
+        valid_until=datetime.now(timezone.utc)
     )
 
     # Patch the PredictionService class
@@ -67,7 +74,7 @@ def test_predict_endpoint_success(client, mocker):
         "app.features.prediction.router.PredictionService"
     )
     mock_service_instance = mock_service_class.return_value
-    mock_service_instance.predict.return_value = mock_response
+    mock_service_instance.predict = mocker.AsyncMock(return_value=mock_response)
 
     # Make request
     response = client.post(
@@ -81,11 +88,13 @@ def test_predict_endpoint_success(client, mocker):
     assert response.status_code == 200
     data = response.json()
     assert set(data.keys()) == {
-        "pair",
-        "probability_up",
-        "probability_down",
-        "probability_straight",
-    }
+            "pair",
+            "probability_up",
+            "probability_down",
+            "probability_straight",
+            "computed_at",
+            "valid_until",
+        }
     assert data["pair"] == "XXBTZUSD"
     assert data["probability_up"] == 0.72
     assert data["probability_down"] == 0.18
@@ -100,13 +109,15 @@ def test_predict_endpoint_ethusd(client, mocker):
         probability_up=0.58,
         probability_down=0.32,
         probability_straight=0.10,
+        computed_at=datetime.now(timezone.utc),
+        valid_until=datetime.now(timezone.utc)
     )
 
     mock_service_class = mocker.patch(
         "app.features.prediction.router.PredictionService"
     )
     mock_service_instance = mock_service_class.return_value
-    mock_service_instance.predict.return_value = mock_response
+    mock_service_instance.predict = mocker.AsyncMock(return_value=mock_response)
 
     # Make request
     response = client.post(
@@ -120,23 +131,25 @@ def test_predict_endpoint_ethusd(client, mocker):
     assert response.status_code == 200
     data = response.json()
     assert set(data.keys()) == {
-        "pair",
-        "probability_up",
-        "probability_down",
-        "probability_straight",
-    }
+            "pair",
+            "probability_up",
+            "probability_down",
+            "probability_straight",
+            "computed_at",
+            "valid_until",
+        }
     assert data["probability_up"] == 0.58
     assert data["probability_down"] == 0.32
     assert data["probability_straight"] == 0.10
 
 
-def test_predict_endpoint_invalid_asset(client):
+def test_predict_endpoint_invalid_asset(client, mocker):
     """Test validation error for invalid asset name."""
     # Make request with invalid asset
     response = client.post(
         "/api/v1/prediction/predict",
         json={
-            "pair": "XXBTZUSD",
+            "pair": "",
         },
     )
 
@@ -182,7 +195,7 @@ def test_predict_endpoint_data_fetch_error(client, mocker):
         "app.features.prediction.router.PredictionService"
     )
     mock_service_instance = mock_service_class.return_value
-    mock_service_instance.predict.side_effect = DataFetchError("Kraken API unreachable")
+    mock_service_instance.predict = mocker.AsyncMock(side_effect=DataFetchError("Kraken API unreachable"))
 
     # Make request
     response = client.post(
@@ -205,9 +218,7 @@ def test_predict_endpoint_insufficient_data_error(client, mocker):
         "app.features.prediction.router.PredictionService"
     )
     mock_service_instance = mock_service_class.return_value
-    mock_service_instance.predict.side_effect = InsufficientDataError(
-        "Need at least 168 rows"
-    )
+    mock_service_instance.predict = mocker.AsyncMock(side_effect=InsufficientDataError("Need at least 168 rows"))
 
     # Make request
     response = client.post(
@@ -230,9 +241,7 @@ def test_predict_endpoint_model_not_loaded_error(client, mocker):
         "app.features.prediction.router.PredictionService"
     )
     mock_service_instance = mock_service_class.return_value
-    mock_service_instance.predict.side_effect = ModelNotLoadedError(
-        "Model file not found"
-    )
+    mock_service_instance.predict = mocker.AsyncMock(side_effect=ModelNotLoadedError("Model file not found"))
 
     # Make request
     response = client.post(
@@ -266,12 +275,14 @@ def test_predict_endpoint_probability_range(client, mocker):
     mock_service_instance = mock_service_class.return_value
 
     # Test with 0.0
-    mock_service_instance.predict.return_value = PredictionResponse(
+    mock_service_instance.predict = mocker.AsyncMock(return_value= PredictionResponse(
         pair="XXBTZUSD",
         probability_up=0.0,
         probability_down=1.0,
         probability_straight=0.0,
-    )
+        computed_at=datetime.now(timezone.utc),
+        valid_until=datetime.now(timezone.utc)
+    ))
 
     response = client.post(
         "/api/v1/prediction/predict", json={"pair": "XXBTZUSD"}
@@ -283,12 +294,14 @@ def test_predict_endpoint_probability_range(client, mocker):
     assert response.json()["probability_straight"] == 0.0
 
     # Test with 1.0
-    mock_service_instance.predict.return_value = PredictionResponse(
+    mock_service_instance.predict = mocker.AsyncMock(return_value= PredictionResponse(
         pair="XXBTZUSD",
         probability_up=1.0,
         probability_down=0.0,
         probability_straight=0.0,
-    )
+        computed_at=datetime.now(timezone.utc),
+        valid_until=datetime.now(timezone.utc)
+    ))
 
     response = client.post(
         "/api/v1/prediction/predict", json={"pair": "XXBTZUSD"}

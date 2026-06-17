@@ -6,7 +6,16 @@ export const apiClient = {
   get: async <T>(endpoint: string): Promise<T> => {
     const response = await fetch(`${API_BASE_URL}${endpoint}`);
     if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`);
+      let errorMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        if (errorData && errorData.detail) {
+          errorMessage = typeof errorData.detail === 'string' ? errorData.detail : JSON.stringify(errorData.detail);
+        }
+      } catch (e) {
+        // Ignore JSON parse errors for non-JSON error responses
+      }
+      throw new Error(`API Error: ${errorMessage}`);
     }
     return response.json();
   },
@@ -18,7 +27,16 @@ export const apiClient = {
       body: JSON.stringify(body),
     });
     if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`);
+      let errorMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        if (errorData && errorData.detail) {
+          errorMessage = typeof errorData.detail === 'string' ? errorData.detail : JSON.stringify(errorData.detail);
+        }
+      } catch (e) {
+        // Ignore JSON parse errors for non-JSON error responses
+      }
+      throw new Error(`API Error: ${errorMessage}`);
     }
     return response.json();
   },

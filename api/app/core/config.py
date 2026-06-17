@@ -62,7 +62,8 @@ class Settings(BaseSettings):
     @property
     def model_path(self) -> Path:
         """Compute canonical absolute path to the ML model file."""
-        return (Path(self.MODEL_DIR) / self.MODEL_FILENAME).expanduser().resolve()
+        base_dir = Path(__file__).resolve().parent.parent.parent
+        return (base_dir / self.MODEL_DIR / self.MODEL_FILENAME).expanduser().resolve()
 
     model_config = SettingsConfigDict(
         env_file=".env",

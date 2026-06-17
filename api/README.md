@@ -1,6 +1,6 @@
 # Forex Predictor API
 
-Backend API for Forex Predictor monorepo.
+Backend API for Forex Predictor monorepo. Please see the [root README.md](../README.md) for full project setup.
 
 ## Configuration
 

@@ -47,4 +47,4 @@ async def predict_price_movement(
         422: If insufficient data or validation errors
         503: If ML model cannot be loaded
     """
-    return service.predict(request)
+    return await service.predict(request)

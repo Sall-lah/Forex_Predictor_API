@@ -15,11 +15,23 @@ Architecture:
 import logging
 import pickle
 import threading
+from datetime import datetime, timezone, timedelta
 from typing import Any, Literal
 
 import joblib
 import numpy as np
 import pandas as pd
+from pydantic import ValidationError
+
+from app.core.config import get_settings
+from app.core.exceptions import (
+    DataFetchError,
+    DataValidationError,
+    ModelNotLoadedError,
+    InsufficientDataError,
+)
+from app.features.prediction.schemas import PredictionRequest, PredictionResponse
+from app.shared.ohlcv import KrakenProvider, OHLCVDataFrame
 from ta import momentum, trend, volatility
 
 from app.core.config import get_settings
@@ -415,125 +427,129 @@ class OHLCVPreprocessor:
 
 class PredictionService:
     """
-    Main service for making forex price predictions.
+    Business logic orchestrator for forex predictions.
 
-    Responsibilities:
-    - Fetch historical OHLCV data via Kraken API
-    - Preprocess data and extract features
-    - Load and use ML model for prediction
-    - Return prediction probabilities
-
-    Workflow:
-    1. Fetch 1 week of hourly OHLCV data from Kraken
-    2. Extract technical indicators and custom features
-    3. Take the latest preprocessed row
-    4. Use LightGBM model to predict price movement
-    5. Return probabilities for movement classes
+    Coordinates:
+    - Data fetching via Kraken API
+    - Feature extraction and alignment
+    - Machine learning inference
+    - Prediction response formatting
+    - Prediction caching
     """
 
     def __init__(
         self,
-        api_client: DataProvider | None = None,
+        api_client: KrakenProvider | None = None,
         model_loader: ModelLoader | None = None,
         preprocessor: OHLCVPreprocessor | None = None,
-    ) -> None:
-        """Inject dependencies or instantiate defaults."""
-        self.api_client = api_client or get_provider()
+    ):
+        self.api_client = api_client or KrakenProvider()
         self.model_loader = model_loader or ModelLoader()
         self.preprocessor = preprocessor or OHLCVPreprocessor()
+        
+        self._cache: dict[tuple[str, int], PredictionResponse] = {}
+        self._cache_lock = threading.Lock()
 
-    def predict(self, request: PredictionRequest) -> PredictionResponse:
-        """
-        Make price movement prediction for given trading pair.
+    def _get_cache_key(self, normalized_pair: str) -> tuple[str, int]:
+        now_utc = datetime.now(timezone.utc)
+        hour_timestamp = int(now_utc.replace(minute=0, second=0, microsecond=0).timestamp())
+        return (normalized_pair, hour_timestamp)
 
-        Args:
-            request: PredictionRequest with pair and asset info
+    def _get_valid_until(self) -> datetime:
+        now_utc = datetime.now(timezone.utc)
+        hour_start = now_utc.replace(minute=0, second=0, microsecond=0)
+        return hour_start + timedelta(hours=1, minutes=2)
 
-        Returns:
-            PredictionResponse with movement class probabilities
+    def _get_cached(self, key: tuple[str, int]) -> PredictionResponse | None:
+        with self._cache_lock:
+            cached = self._cache.get(key)
+            if cached:
+                if datetime.now(timezone.utc) < cached.valid_until:
+                    return cached
+                del self._cache[key]
+            return None
 
-        Raises:
-            DataFetchError: If fetching data from Kraken fails
-            InsufficientDataError: If insufficient data for feature extraction
-            DataValidationError: If data validation fails
-            ModelNotLoadedError: If ML model cannot be loaded
-        """
-        historic_df = self._fetch_historic_dataframe(request)
-        feature_df = self._extract_features(historic_df, request)
+    def _set_cached(self, key: tuple[str, int], response: PredictionResponse) -> None:
+        with self._cache_lock:
+            self._cache[key] = response
+
+    async def predict(self, request: PredictionRequest) -> PredictionResponse:
+        from app.shared.ohlcv.pair_normalizer import normalize_pair
+        normalized_pair = normalize_pair(request.pair)
+        
+        cache_key = self._get_cache_key(normalized_pair)
+        cached = self._get_cached(cache_key)
+        if cached:
+            return cached
+
+        logger.info("Loading LightGBM model")
+        model = self.model_loader.get_model()
+        if not hasattr(model, "predict_proba"):
+            raise ModelNotLoadedError("Model missing predict_proba method")
+
+        historic_df = await self._fetch_historic_dataframe(normalized_pair)
+        feature_df = self._extract_features(historic_df, normalized_pair)
         latest_features = self._select_latest_feature_row(feature_df)
-        probabilities = self._predict_probabilities(request.pair, latest_features)
-        prob_straight, prob_up, prob_down = self._extract_probabilities(probabilities)
-
-        logger.info(
-            "Prediction completed for '%s': straight=%.4f up=%.4f down=%.4f",
-            request.pair,
-            prob_straight,
-            prob_up,
-            prob_down,
+        
+        logger.info("Aligning features to model schema")
+        required_features = self._resolve_model_feature_names(model)
+        aligned_features = self._align_and_validate_features(
+            latest_features, required_features
         )
 
-        return PredictionResponse(
-            pair=request.pair,
+        logger.info("Making prediction for '%s'", normalized_pair)
+        probabilities = self._execute_inference(model, aligned_features)
+        prob_straight, prob_up, prob_down = self._extract_probabilities(probabilities)
+
+        response = PredictionResponse(
+            pair=normalized_pair,
             probability_up=prob_up,
             probability_down=prob_down,
             probability_straight=prob_straight,
+            computed_at=datetime.now(timezone.utc),
+            valid_until=self._get_valid_until()
         )
+        
+        self._set_cached(cache_key, response)
+        return response
 
-    def _fetch_historic_dataframe(self, request: PredictionRequest) -> pd.DataFrame:
-        """Fetch and parse provider OHLCV payload into a DataFrame."""
-        logger.info("Fetching OHLCV data for '%s'", request.pair)
-        payload = self.api_client.fetch_ohlcv_data(
-            request.pair, count=180, interval=60
+    async def _fetch_historic_dataframe(self, normalized_pair: str) -> pd.DataFrame:
+        logger.info("Fetching OHLCV data for '%s'", normalized_pair)
+        payload = await self.api_client.fetch_ohlcv_data(
+            normalized_pair, count=720, interval=60
         )
         ohlcv_data = OHLCVDataFrame.from_provider_response(payload)
 
         logger.info(
             "Fetched %d candles for '%s' (interval: 60m)",
             len(ohlcv_data.df),
-            request.pair,
+            normalized_pair,
         )
         return ohlcv_data.df
 
-    def _extract_features(
-        self, historic_df: pd.DataFrame, request: PredictionRequest
-    ) -> pd.DataFrame:
-        """Extract model features for the requested asset."""
-        logger.info("Extracting features for '%s'", request.pair)
-        df_features = self.preprocessor.extract_features(historic_df)
+    def _extract_features(self, df: pd.DataFrame, normalized_pair: str) -> pd.DataFrame:
+        logger.info("Extracting features for '%s'", normalized_pair)
+        features = self.preprocessor.extract_features(df)
         logger.info(
             "Feature extraction completed: %d rows, %d features",
-            len(df_features),
-            len(df_features.columns),
+            len(features),
+            len(features.columns),
         )
-        return df_features
+        return features
 
-    @staticmethod
-    def _select_latest_feature_row(feature_df: pd.DataFrame) -> pd.DataFrame:
-        """Select the latest feature row while preserving DataFrame shape."""
-        if feature_df.empty:
-            raise InsufficientDataError("No feature rows available for prediction")
-        return feature_df.iloc[[-1]]
+    def _select_latest_feature_row(self, df: pd.DataFrame) -> pd.DataFrame:
+        if df.empty:
+            raise InsufficientDataError("No valid feature rows available after preprocessing")
+        return df.iloc[[-1]]
 
-    def _predict_probabilities(self, pair: str, latest_features: pd.DataFrame) -> Any:
-        """Load model and obtain class-probability predictions."""
-        logger.info("Loading LightGBM model")
-        model = self.model_loader.get_model()
-
-        if not hasattr(model, "predict_proba"):
-            raise ModelNotLoadedError("Loaded model does not expose predict_proba")
-
-        required_features = self._resolve_model_feature_names(model)
-        aligned_features = self._align_and_validate_features(
-            latest_features=latest_features,
-            required_features=required_features,
-        )
-
-        logger.info("Making prediction for '%s'", pair)
-        return model.predict_proba(aligned_features)
+    def _execute_inference(self, model: Any, aligned_features: pd.DataFrame) -> Any:
+        try:
+            return model.predict_proba(aligned_features)
+        except Exception as error:
+            raise RuntimeError(f"Model inference failed: {error}") from error
 
     @staticmethod
     def _resolve_model_feature_names(model: Any) -> list[str]:
-        """Resolve model feature names from LightGBM metadata."""
         feature_names: Any | None = getattr(model, "feature_name_", None)
 
         if not isinstance(feature_names, (list, tuple, pd.Index, np.ndarray)):
@@ -563,7 +579,6 @@ class PredictionService:
     def _align_and_validate_features(
         latest_features: pd.DataFrame, required_features: list[str]
     ) -> pd.DataFrame:
-        """Align latest features to model contract and validate numeric integrity."""
         missing_columns = [
             column
             for column in required_features
@@ -584,20 +599,16 @@ class PredictionService:
             ) from error
 
         if not np.isfinite(feature_values).all():
+            non_finite_mask = ~np.isfinite(aligned_features)
+            bad_cols = aligned_features.columns[non_finite_mask.any(axis=0)].tolist()
             raise DataValidationError(
-                "Aligned model features contain non-finite values (NaN/Inf)"
+                f"Aligned model features contain non-finite values (NaN/Inf) in columns: {', '.join(bad_cols)}"
             )
 
         return aligned_features
 
     @staticmethod
     def _extract_probabilities(probabilities: Any) -> tuple[float, float, float]:
-        """
-        Extract class probabilities from model output with validation.
-
-        Class order follows the model usage guide:
-        0 = Hold (straight), 1 = Buy (up), 2 = Sell (down).
-        """
         try:
             class_zero_probability = probabilities[0][0]
             class_one_probability = probabilities[0][1]

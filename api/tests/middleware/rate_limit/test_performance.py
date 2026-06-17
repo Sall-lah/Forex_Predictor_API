@@ -172,8 +172,7 @@ def test_memory_soak_mode_runs_only_when_enabled() -> None:
     Run explicitly:
         RATE_LIMIT_SOAK=1 pytest tests/middleware/rate_limit/test_performance.py -k "soak" -x
     """
-    if os.getenv("RATE_LIMIT_SOAK") != "1":
-        pytest.skip("Set RATE_LIMIT_SOAK=1 to run long-run soak validation.")
+
 
     service = RateLimiterService(settings=_build_perf_settings())
     service._bucket = TokenBucket(now_func=FixedClock(now=4000.0).now)

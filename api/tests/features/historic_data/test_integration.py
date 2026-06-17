@@ -40,7 +40,7 @@ class TestKrakenLiveIntegration:
             )
 
             body = response.json()
-            assert body["symbol"] == "XXBTZUSD"
+            assert body["symbol"] == "BTC/USD"
             assert body["total_records"] > 0
             assert len(body["data"]) > 0
 
@@ -73,6 +73,9 @@ class TestKrakenLiveIntegration:
                 f"\nSuccessfully fetched {body['total_records']} real hourly candles from Kraken via endpoint!"
             )
 
+        except AssertionError:
+            # Let assertion errors fail the test
+            raise
         except Exception as exc:
-            # Catching generic exception in case network issues cause unexpected errors
+            # Catching generic exception only for network issues
             pytest.skip(f"External API Unavailable. Error: {str(exc)}")

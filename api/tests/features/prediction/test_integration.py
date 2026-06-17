@@ -8,6 +8,8 @@ Run with: pytest tests/features/prediction/test_integration.py -v
 """
 
 import pytest
+pytestmark = pytest.mark.asyncio
+
 
 from app.core.config import get_settings
 from app.core.exceptions import DataFetchError
@@ -16,7 +18,7 @@ from app.features.prediction.schemas import PredictionRequest
 
 
 @pytest.mark.integration
-def test_predict_btcusd_live():
+async def test_predict_btcusd_live():
     """
     Live test: Fetch real data from Kraken and make prediction for BTC/USD.
 
@@ -39,7 +41,7 @@ def test_predict_btcusd_live():
     # 3. Load the actual LightGBM model
     # 4. Make a real prediction
     try:
-        response = service.predict(request)
+        response = await service.predict(request)
     except DataFetchError as error:
         pytest.skip(
             f"Skipping live Kraken integration due to network dependency: {error}"
@@ -47,7 +49,7 @@ def test_predict_btcusd_live():
     print(response)
 
     # Assert
-    assert response.pair == "BTC/USD"
+    assert response.pair == "XXBTZUSD"
     assert 0.0 <= response.probability_up <= 1.0
     assert 0.0 <= response.probability_down <= 1.0
     assert 0.0 <= response.probability_straight <= 1.0
@@ -61,7 +63,7 @@ def test_predict_btcusd_live():
 
 
 @pytest.mark.integration
-def test_predict_ethusd_live():
+async def test_predict_ethusd_live():
     """
     Live test: Fetch real data from Kraken and make prediction for ETH/USD.
     """
@@ -73,14 +75,14 @@ def test_predict_ethusd_live():
 
     # Execute
     try:
-        response = service.predict(request)
+        response = await service.predict(request)
     except DataFetchError as error:
         pytest.skip(
             f"Skipping live Kraken integration due to network dependency: {error}"
         )
 
     # Assert
-    assert response.pair == "ETH/USD"
+    assert response.pair == "XETHZUSD"
     assert 0.0 <= response.probability_up <= 1.0
     assert 0.0 <= response.probability_down <= 1.0
     assert 0.0 <= response.probability_straight <= 1.0
@@ -117,7 +119,7 @@ def test_predict_via_api_btcusd_live(client):
     assert response.status_code == 200
     data = response.json()
 
-    assert data["pair"] == "BTC/USD"
+    assert data["pair"] == "XXBTZUSD"
     assert "probability_up" in data
     assert "probability_down" in data
     assert "probability_straight" in data
@@ -150,7 +152,7 @@ def test_predict_via_api_ethusd_live(client):
     assert response.status_code == 200
     data = response.json()
 
-    assert data["pair"] == "ETH/USD"
+    assert data["pair"] == "XETHZUSD"
     assert 0.0 <= data["probability_up"] <= 1.0
     assert 0.0 <= data["probability_down"] <= 1.0
     assert 0.0 <= data["probability_straight"] <= 1.0
@@ -159,7 +161,7 @@ def test_predict_via_api_ethusd_live(client):
 
 
 @pytest.mark.integration
-def test_predict_model_consistency():
+async def test_predict_model_consistency():
     """
     Test that the model produces consistent results for the same input.
 
@@ -173,8 +175,8 @@ def test_predict_model_consistency():
 
     # Make two predictions
     try:
-        response1 = service.predict(request)
-        response2 = service.predict(request)
+        response1 = await service.predict(request)
+        response2 = await service.predict(request)
     except DataFetchError as error:
         pytest.skip(
             f"Skipping live consistency test due to network dependency: {error}"
@@ -201,7 +203,7 @@ def test_predict_model_consistency():
 
 
 @pytest.mark.integration
-def test_prediction_service_uses_configured_model_path():
+async def test_prediction_service_uses_configured_model_path():
     """Regression: configured settings.model_path should resolve to existing artifact."""
     settings = get_settings()
     assert settings.model_path.exists(), (

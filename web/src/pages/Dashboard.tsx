@@ -1,11 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Chart } from '../components/Chart';
 import { useMarketData } from '../hooks/useMarketData';
 import { HealthStatus } from '../components/HealthStatus';
+import { usePrediction } from '../hooks/usePrediction';
+
+function formatRelativeTime(date: Date): string {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (diffInSeconds < 60) return "just now";
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    return `${diffInMinutes}m ago`;
+}
+
+function formatUTCTime(date: Date): string {
+    return date.toISOString().substring(11, 16) + ' UTC';
+}
+
 
 export const Dashboard: React.FC = () => {
     const [intervalMinutes, setIntervalMinutes] = useState<number>(1);
     const { data, isHealthy, currentPrice, isLoading } = useMarketData('BTC/USD', intervalMinutes);
+    const { probabilities, computedAt, validUntil, isLoading: isPredLoading } = usePrediction('XXBTZUSD');
+    const [, setNow] = useState(new Date());
+    useEffect(() => {
+        const timer = setInterval(() => setNow(new Date()), 30000);
+        return () => clearInterval(timer);
+    }, []);
     const latestData = data.length > 0 ? data[data.length - 1] : null;
 
     return (
@@ -214,50 +234,66 @@ export const Dashboard: React.FC = () => {
                                 </div>
                             </h3>
                             <div className="space-y-3">
-                                {/* Buy Box */}
-                                <div className="group bg-surface-container-low p-4 rounded border-l-4 border-secondary hover:bg-secondary/5 transition-all cursor-pointer">
-                                    <div className="flex justify-between items-end">
-                                        <div className="flex flex-col">
-                                            <span className="text-[9px] text-outline uppercase tracking-widest mb-0.5">Buy Prediction</span>
-                                            <span className="text-xl font-headline font-extrabold text-secondary">65%</span>
+                                {isPredLoading || !probabilities ? (
+                                    <div className="space-y-3 animate-pulse">
+                                        {[1, 2, 3].map(i => (
+                                            <div key={i} className="bg-surface-container-low p-4 rounded h-[72px]"></div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* Buy Box */}
+                                        <div className="group bg-surface-container-low p-4 rounded border-l-4 border-secondary hover:bg-secondary/5 transition-all cursor-pointer">
+                                            <div className="flex justify-between items-end">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[9px] text-outline uppercase tracking-widest mb-0.5">Buy Prediction</span>
+                                                    <span className="text-xl font-headline font-extrabold text-secondary">{(probabilities.up * 100).toFixed(1)}%</span>
+                                                </div>
+                                                <span className="material-symbols-outlined text-secondary opacity-20 group-hover:opacity-100 transition-opacity text-lg" data-icon="trending_up">trending_up</span>
+                                            </div>
+                                            <div className="mt-2 h-1 bg-surface-container-highest rounded-full overflow-hidden">
+                                                <div className="h-full bg-secondary transition-all duration-500" style={{ width: `${probabilities.up * 100}%` }}></div>
+                                            </div>
                                         </div>
-                                        <span className="material-symbols-outlined text-secondary opacity-20 group-hover:opacity-100 transition-opacity text-lg" data-icon="trending_up">trending_up</span>
-                                    </div>
-                                    <div className="mt-2 h-1 bg-surface-container-highest rounded-full overflow-hidden">
-                                        <div className="h-full bg-secondary" style={{ width: "65%" }}></div>
-                                    </div>
-                                </div>
-                                {/* Hold Box */}
-                                <div className="group bg-surface-container-low p-4 rounded border-l-4 border-outline hover:bg-outline/5 transition-all cursor-pointer">
-                                    <div className="flex justify-between items-end">
-                                        <div className="flex flex-col">
-                                            <span className="text-[9px] text-outline uppercase tracking-widest mb-0.5">Hold Neutral</span>
-                                            <span className="text-xl font-headline font-extrabold text-outline">10%</span>
+                                        {/* Hold Box */}
+                                        <div className="group bg-surface-container-low p-4 rounded border-l-4 border-outline hover:bg-outline/5 transition-all cursor-pointer">
+                                            <div className="flex justify-between items-end">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[9px] text-outline uppercase tracking-widest mb-0.5">Hold Neutral</span>
+                                                    <span className="text-xl font-headline font-extrabold text-outline">{(probabilities.straight * 100).toFixed(1)}%</span>
+                                                </div>
+                                                <span className="material-symbols-outlined text-outline opacity-20 group-hover:opacity-100 transition-opacity text-lg" data-icon="horizontal_rule">horizontal_rule</span>
+                                            </div>
+                                            <div className="mt-2 h-1 bg-surface-container-highest rounded-full overflow-hidden">
+                                                <div className="h-full bg-outline transition-all duration-500" style={{ width: `${probabilities.straight * 100}%` }}></div>
+                                            </div>
                                         </div>
-                                        <span className="material-symbols-outlined text-outline opacity-20 group-hover:opacity-100 transition-opacity text-lg" data-icon="horizontal_rule">horizontal_rule</span>
-                                    </div>
-                                    <div className="mt-2 h-1 bg-surface-container-highest rounded-full overflow-hidden">
-                                        <div className="h-full bg-outline" style={{ width: "10%" }}></div>
-                                    </div>
-                                </div>
-                                {/* Sell Box */}
-                                <div className="group bg-surface-container-low p-4 rounded border-l-4 border-tertiary hover:bg-tertiary/5 transition-all cursor-pointer">
-                                    <div className="flex justify-between items-end">
-                                        <div className="flex flex-col">
-                                            <span className="text-[9px] text-outline uppercase tracking-widest mb-0.5">Sell Prediction</span>
-                                            <span className="text-xl font-headline font-extrabold text-tertiary">25%</span>
+                                        {/* Sell Box */}
+                                        <div className="group bg-surface-container-low p-4 rounded border-l-4 border-tertiary hover:bg-tertiary/5 transition-all cursor-pointer">
+                                            <div className="flex justify-between items-end">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[9px] text-outline uppercase tracking-widest mb-0.5">Sell Prediction</span>
+                                                    <span className="text-xl font-headline font-extrabold text-tertiary">{(probabilities.down * 100).toFixed(1)}%</span>
+                                                </div>
+                                                <span className="material-symbols-outlined text-tertiary opacity-20 group-hover:opacity-100 transition-opacity text-lg" data-icon="trending_down">trending_down</span>
+                                            </div>
+                                            <div className="mt-2 h-1 bg-surface-container-highest rounded-full overflow-hidden">
+                                                <div className="h-full bg-tertiary transition-all duration-500" style={{ width: `${probabilities.down * 100}%` }}></div>
+                                            </div>
                                         </div>
-                                        <span className="material-symbols-outlined text-tertiary opacity-20 group-hover:opacity-100 transition-opacity text-lg" data-icon="trending_down">trending_down</span>
-                                    </div>
-                                    <div className="mt-2 h-1 bg-surface-container-highest rounded-full overflow-hidden">
-                                        <div className="h-full bg-tertiary" style={{ width: "25%" }}></div>
-                                    </div>
-                                </div>
+                                    </>
+                                )}
                             </div>
                             <div className="mt-5 pt-4 border-t border-outline-variant/10">
-                                <p className="text-[9px] text-outline leading-relaxed italic">
-                                    Institutional analysis suggests a strong bullish momentum sustained by recent ECB projections.
-                                </p>
+                                {computedAt && validUntil ? (
+                                    <p className="text-[9px] text-outline leading-relaxed italic">
+                                        Updated {formatRelativeTime(computedAt)} · refreshes at {formatUTCTime(validUntil)}
+                                    </p>
+                                ) : (
+                                    <p className="text-[9px] text-outline leading-relaxed italic">
+                                        Institutional analysis suggests a strong bullish momentum sustained by recent ECB projections.
+                                    </p>
+                                )}
                             </div>
                         </div>
 

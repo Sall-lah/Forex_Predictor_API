@@ -23,14 +23,14 @@ class KrakenProvider:
         self.base_url = base_url or settings.KRAKEN_OHLC_URL
         self.timeout = timeout or settings.KRAKEN_TIMEOUT
 
-    def fetch_ohlcv_data(
+    async def fetch_ohlcv_data(
         self, pair: str, count: int, interval: int = 1
     ) -> list[dict[str, object]]:
         """Fetch raw OHLCV payload from Kraken and preprocess to standard format."""
         query_params = self._build_query_params(
             pair=pair, count=count, interval=interval
         )
-        payload = self._request_payload(pair=pair, query_params=query_params)
+        payload = await self._request_payload(pair=pair, query_params=query_params)
         self._validate_api_response(payload=payload, pair=pair)
         
         return self._preprocess_payload(payload=payload, pair=pair)
@@ -44,9 +44,7 @@ class KrakenProvider:
             last_completed_candle = result["last"]
 
             # Exclude incomplete candle
-            if raw_candles and raw_candles[-1][0] == last_completed_candle:
-                pass
-            elif raw_candles and last_completed_candle != raw_candles[-1][0]:
+            if raw_candles and last_completed_candle != raw_candles[-1][0]:
                 raw_candles = raw_candles[:-1]
 
             return [
@@ -67,20 +65,23 @@ class KrakenProvider:
         self, pair: str, count: int, interval: int
     ) -> dict[str, int | str]:
         """Build Kraken OHLC query parameters for pair and time range."""
+        # Note: We do NOT pass `count` to the Kraken OHLC endpoint because it ignores it.
+        # Kraken returns the last 720 candles by default. We use `since` to filter.
         return {
             "pair": pair,
             "interval": interval,
             "since": self._calculate_since_timestamp(count, interval),
         }
 
-    def _request_payload(self, pair: str, query_params: dict[str, int | str]) -> dict:
+    async def _request_payload(self, pair: str, query_params: dict[str, int | str]) -> dict:
         """Execute Kraken request and return parsed JSON payload."""
         try:
-            response = httpx.get(
-                self.base_url,
-                params=query_params,
-                timeout=self.timeout,
-            )
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    self.base_url,
+                    params=query_params,
+                    timeout=self.timeout,
+                )
             response.raise_for_status()
         except httpx.RequestError as error:
             raise DataFetchError(
@@ -107,9 +108,13 @@ class KrakenProvider:
 
     @staticmethod
     def _calculate_since_timestamp(count: int, interval: int) -> int:
-        """Calculate Unix timestamp for count ago, UTC-aligned."""
+        """Calculate Unix timestamp for 720 candles ago, UTC-aligned.
+        
+        Regardless of the `count` argument, we always request 720 candles 
+        to ensure technical indicators have enough history.
+        """
         now = pd.Timestamp.now(tz="UTC").floor("h")
-        return int(now.timestamp() - (count * interval * 60))
+        return int(now.timestamp() - (720 * interval * 60))
 
     @staticmethod
     def _validate_api_response(payload: dict, pair: str) -> None:

@@ -20,7 +20,7 @@ client = TestClient(app)
 class MockHistoricDataService:
     """Mock service returning predictable OHLCV data for testing."""
 
-    def fetch_hourly_ohlcv(self, pair: str, interval: int = 60) -> HistoricDataResponse:
+    async def get_live_data(self, request) -> HistoricDataResponse:
         """Return mock OHLCV data."""
         record = OHLCVRecord(
             timestamp=datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc),
@@ -30,7 +30,7 @@ class MockHistoricDataService:
             close=50500.0,
             volume=2.5,
         )
-        return HistoricDataResponse(symbol=pair, total_records=1, data=[record])
+        return HistoricDataResponse(symbol=request.pair, total_records=1, data=[record])
 
 
 def override_service():

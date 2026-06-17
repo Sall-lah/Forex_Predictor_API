@@ -61,4 +61,4 @@ async def get_live_data(
         Response with OHLCV records
     """
     request = HistoricDataRequest(pair=pair, interval=interval, count=count)
-    return service.get_live_data(request)
+    return await service.get_live_data(request)

@@ -6,6 +6,7 @@ Models:
 - PredictionResponse: Response containing prediction probability
 """
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -54,4 +55,12 @@ class PredictionResponse(BaseModel):
         description="Probability of straight (hold) movement in range [0.0, 1.0]",
         ge=0.0,
         le=1.0,
+    )
+    computed_at: datetime = Field(
+        ...,
+        description="Timestamp when the prediction was computed (UTC)",
+    )
+    valid_until: datetime = Field(
+        ...,
+        description="Timestamp when the prediction expires and needs recomputation (UTC)",
     )
