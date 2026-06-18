@@ -52,6 +52,11 @@ export default defineConfig({
         ws: true,
         configure: (proxy) => configureProxyRetry(proxy, '/ws'),
       },
+      '/health': {
+        target: PROXY_TARGET,
+        changeOrigin: true,
+        configure: (proxy) => configureProxyRetry(proxy, '/health'),
+      },
     },
   },
 });

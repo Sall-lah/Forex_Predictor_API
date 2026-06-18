@@ -78,11 +78,22 @@ export class CandleStore {
   getStatus = (): LiveStatus => this.status;
 
   setCandles(candles: readonly Candle[]): void {
-    const next = normalise(candles);
-    if (candlesEqual(this.candles, next)) {
-      // Referentially stable: same content -> no re-render.
-      return;
+    // Merge REST data into existing candles: only add candles that
+    // don't already exist. WebSocket ticks are the source of truth
+    // for candles already in the store (more up-to-date OHLCV values).
+    const existingByTime = new Map<number, Candle>();
+    for (const c of this.candles) {
+      existingByTime.set(c.time, c);
     }
+    for (const c of candles) {
+      if (!existingByTime.has(c.time)) {
+        existingByTime.set(c.time, c);
+      }
+    }
+    const next = Array.from(existingByTime.values()).sort(
+      (a, b) => a.time - b.time
+    );
+    if (candlesEqual(this.candles, next)) return;
     this.candles = next;
     this.lastUpdatedAt = Date.now();
     this.publish();

@@ -1,6 +1,6 @@
 /**
- * Lightweight helper for the BFF `/health` endpoint. Routes through
- * the shared `apiClient` for consistent error handling.
+ * Lightweight helper for the `/health` endpoint. Routes through
+ * the Vite proxy to the FastAPI backend.
  */
 
 import { get } from './apiClient';
@@ -11,8 +11,7 @@ export interface HealthResponse {
 }
 
 export async function fetchHealth(): Promise<HealthResponse> {
-  // `/health` is served by the BFF (not the API prefix), so we hit
-  // the root path directly.
+  // `/health` is proxied through Vite to the backend root path.
   const response = await fetch('/health');
   if (!response.ok) {
     throw new Error(`Health check failed: ${response.statusText}`);

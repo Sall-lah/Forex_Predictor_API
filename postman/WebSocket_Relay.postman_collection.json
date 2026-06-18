@@ -1,0 +1,76 @@
+{
+  "info": {
+    "name": "Forex Predictor WebSocket Relay",
+    "_postman_id": "ws-relay-test-collection",
+    "description": "Test collection for the Forex Predictor WebSocket relay.\n\nPrerequisites:\n- BFF server running on localhost:3000\n- Backend API running on localhost:8000\n- Postman v10+ with WebSocket support\n\nThe BFF proxies WebSocket connections from port 3000 to the backend on port 8000.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "BFF WebSocket - Subscribe BTC/USD 1m",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Origin",
+            "value": "http://localhost:3000",
+            "description": "Required by the BFF origin check"
+          }
+        ],
+        "url": {
+          "raw": "ws://localhost:3000/api/v1/ws/stream",
+          "protocol": "ws",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["api", "v1", "ws", "stream"]
+        },
+        "description": "Connect to the BFF WebSocket relay and subscribe to BTC/USD 1-minute candles.\n\nAfter connecting, send the subscribe message below.\n\nExpected: CandleTick payloads with is_closed: false while forming, is_closed: true when complete."
+      },
+      "response": []
+    },
+    {
+      "name": "BFF WebSocket - Subscribe ETH/USD 5m",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Origin",
+            "value": "http://localhost:3000",
+            "description": "Required by the BFF origin check"
+          }
+        ],
+        "url": {
+          "raw": "ws://localhost:3000/api/v1/ws/stream",
+          "protocol": "ws",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["api", "v1", "ws", "stream"]
+        },
+        "description": "Connect to the BFF WebSocket relay and subscribe to ETH/USD 5-minute candles."
+      },
+      "response": []
+    },
+    {
+      "name": "Backend WebSocket - Direct (port 8000)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Origin",
+            "value": "http://localhost:3000",
+            "description": "Required by the backend WS_ALLOWED_ORIGINS check"
+          }
+        ],
+        "url": {
+          "raw": "ws://localhost:8000/api/v1/ws/stream",
+          "protocol": "ws",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "v1", "ws", "stream"]
+        },
+        "description": "Direct connection to the backend WebSocket (bypasses BFF). Useful for debugging."
+      },
+      "response": []
+    }
+  ]
+}

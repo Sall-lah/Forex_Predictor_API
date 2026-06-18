@@ -25,6 +25,7 @@ def _make_health_endpoint(app: FastAPI) -> None:
         subscriptions = (
             health.get("subscriptions", []) if isinstance(health, dict) else []
         )
+        kraken_started = bool(health.get("kraken_started", False)) if isinstance(health, dict) else False
         kraken_connected = bool(getattr(client, "connected", False)) if client else False
         last_tick_at = getattr(client, "last_tick_at", None) if client else None
         reconnect_count = int(getattr(client, "reconnect_count", 0)) if client else 0
@@ -38,13 +39,14 @@ def _make_health_endpoint(app: FastAPI) -> None:
 
         now = datetime.now(tz=timezone.utc)
         upstream_down = (
-            not kraken_connected
+            kraken_started
+            and not kraken_connected
             and last_tick_at is not None
             and (now - last_tick_at) > UPSTREAM_DOWN_THRESHOLD
         )
         if upstream_down:
             status = "unhealthy"
-        elif not kraken_connected or client_stats.get("slow_disconnects", 0) > 0:
+        elif not kraken_started or not kraken_connected or client_stats.get("slow_disconnects", 0) > 0:
             status = "degraded"
         else:
             status = "healthy"
@@ -52,6 +54,7 @@ def _make_health_endpoint(app: FastAPI) -> None:
         return {
             "status": status,
             "upstream": {
+                "kraken_started": kraken_started,
                 "kraken_connected": kraken_connected,
                 "last_tick_at": last_tick_at.isoformat() if last_tick_at else None,
                 "reconnect_count": reconnect_count,
@@ -89,6 +92,7 @@ def test_health_endpoint_returns_extended_payload() -> None:
         "last_tick_at": None,
         "reconnect_count": 0,
         "subscriptions": [],
+        "kraken_started": False,
     }
     _make_health_endpoint(local)
 
@@ -97,6 +101,7 @@ def test_health_endpoint_returns_extended_payload() -> None:
     body = response.json()
     assert "status" in body
     assert "upstream" in body
+    assert "kraken_started" in body["upstream"]
     assert "kraken_connected" in body["upstream"]
     assert "last_tick_at" in body["upstream"]
     assert "reconnect_count" in body["upstream"]
@@ -115,7 +120,10 @@ def test_status_unhealthy_when_upstream_down_over_threshold() -> None:
     local = FastAPI()
     local.state.connection_manager = ConnectionManager(settings=Settings())
     local.state.kraken_ws_client = _StubClient()
-    local.state.realtime_health = {"subscriptions": []}
+    local.state.realtime_health = {
+        "subscriptions": [],
+        "kraken_started": True,
+    }
     _make_health_endpoint(local)
 
     response = TestClient(local).get("/health")
@@ -132,8 +140,51 @@ def test_status_degraded_when_kraken_disconnected_with_recent_tick() -> None:
     local = FastAPI()
     local.state.connection_manager = ConnectionManager(settings=Settings())
     local.state.kraken_ws_client = _StubClient()
-    local.state.realtime_health = {"subscriptions": []}
+    local.state.realtime_health = {
+        "subscriptions": [],
+        "kraken_started": True,
+    }
     _make_health_endpoint(local)
 
     body = TestClient(local).get("/health").json()
     assert body["status"] == "degraded"
+
+
+def test_status_degraded_when_kraken_not_started() -> None:
+    """Health check should report 'degraded' when client not yet started."""
+    local = FastAPI()
+    local.state.connection_manager = ConnectionManager(settings=Settings())
+    local.state.kraken_ws_client = None
+    local.state.realtime_health = {
+        "subscriptions": [],
+        "kraken_started": False,
+    }
+    _make_health_endpoint(local)
+
+    body = TestClient(local).get("/health").json()
+    assert body["status"] == "degraded"
+    assert body["upstream"]["kraken_started"] is False
+    assert body["upstream"]["kraken_connected"] is False
+
+
+def test_healthy_when_started_and_connected() -> None:
+    """Health check should report 'healthy' when started and connected."""
+
+    class _StubClient:
+        connected = True
+        last_tick_at = datetime.now(tz=timezone.utc)
+        reconnect_count = 0
+
+    local = FastAPI()
+    local.state.connection_manager = ConnectionManager(settings=Settings())
+    local.state.kraken_ws_client = _StubClient()
+    local.state.realtime_health = {
+        "subscriptions": [],
+        "kraken_started": True,
+    }
+    _make_health_endpoint(local)
+
+    body = TestClient(local).get("/health").json()
+    assert body["status"] == "healthy"
+    assert body["upstream"]["kraken_started"] is True
+    assert body["upstream"]["kraken_connected"] is True

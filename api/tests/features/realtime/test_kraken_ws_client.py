@@ -241,3 +241,98 @@ async def test_full_cycle_against_local_server() -> None:
         assert client.connected is False
         assert len(captured) >= 1
         assert captured[0].pair == "XXBTZUSD"
+
+
+# ------------------------------------------------------------------
+# start_kraken_if_needed tests
+# ------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_start_kraken_if_needed_creates_client(monkeypatch) -> None:
+    """start_kraken_if_needed should create and store a KrakenWSClient."""
+    from fastapi import FastAPI
+
+    from app.features.realtime.kraken_ws_client import start_kraken_if_needed
+
+    app = FastAPI()
+    app.state.kraken_ws_client = None
+    app.state.connection_manager = None
+    app.state.realtime_health = {
+        "kraken_connected": False,
+        "last_tick_at": None,
+        "reconnect_count": 0,
+        "subscriptions": [],
+    }
+
+    # Stub Settings to avoid env var issues
+    monkeypatch.setattr(
+        "app.features.realtime.kraken_ws_client.Settings",
+        lambda: _settings(),
+    )
+    # Stub KrakenWSClient.start to avoid real WS connection
+    monkeypatch.setattr(
+        "app.features.realtime.kraken_ws_client.KrakenWSClient.start",
+        lambda self: None,
+    )
+
+    await start_kraken_if_needed(app)
+
+    assert app.state.kraken_ws_client is not None
+    assert isinstance(app.state.kraken_ws_client, KrakenWSClient)
+    assert app.state.connection_manager is not None
+    assert app.state.realtime_health["kraken_started"] is True
+
+
+@pytest.mark.asyncio
+async def test_start_kraken_if_needed_is_noop_when_already_started(monkeypatch) -> None:
+    """If client already exists, start_kraken_if_needed should be a no-op."""
+    from fastapi import FastAPI
+
+    from app.features.realtime.kraken_ws_client import start_kraken_if_needed
+
+    existing = object()
+    app = FastAPI()
+    app.state.kraken_ws_client = existing
+
+    await start_kraken_if_needed(app)
+
+    # Should not have been replaced
+    assert app.state.kraken_ws_client is existing
+
+
+@pytest.mark.asyncio
+async def test_start_kraken_if_needed_handles_start_failure(monkeypatch) -> None:
+    """If client.start() raises, the function should log and not propagate."""
+    from fastapi import FastAPI
+
+    from app.features.realtime.kraken_ws_client import start_kraken_if_needed
+
+    app = FastAPI()
+    app.state.kraken_ws_client = None
+    app.state.connection_manager = None
+    app.state.realtime_health = {
+        "kraken_connected": False,
+        "last_tick_at": None,
+        "reconnect_count": 0,
+        "subscriptions": [],
+    }
+
+    monkeypatch.setattr(
+        "app.features.realtime.kraken_ws_client.Settings",
+        lambda: _settings(),
+    )
+
+    async def _fail_start(self):
+        raise ConnectionError("network error")
+
+    monkeypatch.setattr(
+        "app.features.realtime.kraken_ws_client.KrakenWSClient.start",
+        _fail_start,
+    )
+
+    # Should not raise
+    await start_kraken_if_needed(app)
+
+    # Client should still be stored (it was created, just failed to start)
+    assert app.state.kraken_ws_client is not None

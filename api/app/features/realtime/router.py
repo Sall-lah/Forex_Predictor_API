@@ -22,7 +22,7 @@ from app.features.realtime.connection_manager import (
     ConnectionManager,
     get_connection_manager,
 )
-from app.shared.ohlcv.pair_normalizer import normalize_pair
+from app.features.realtime.kraken_ws_client import start_kraken_if_needed
 
 if TYPE_CHECKING:  # pragma: no cover
     pass
@@ -67,6 +67,9 @@ async def ws_stream(websocket: WebSocket) -> None:
         )
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
+
+    # Lazily start the Kraken WS client on the first frontend connection.
+    await start_kraken_if_needed(websocket.app)
 
     manager = _get_manager(websocket)
     await manager.connect(websocket)
@@ -114,11 +117,7 @@ async def _listener_loop(
                 interval = payload.get("interval")
                 if not isinstance(pair, str) or not isinstance(interval, int):
                     continue
-                try:
-                    canonical = normalize_pair(pair)
-                except Exception:
-                    continue
-                key = (canonical, interval)
+                key = (pair, interval)
                 if action == "subscribe":
                     manager.add_to_client_filter(websocket, key)
                 else:

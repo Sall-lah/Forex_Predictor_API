@@ -41,11 +41,6 @@ class KrakenProvider:
             result = payload["result"]
             pair_key = next(key for key in result if key != "last")
             raw_candles = result[pair_key]
-            last_completed_candle = result["last"]
-
-            # Exclude incomplete candle
-            if raw_candles and last_completed_candle != raw_candles[-1][0]:
-                raw_candles = raw_candles[:-1]
 
             return [
                 {

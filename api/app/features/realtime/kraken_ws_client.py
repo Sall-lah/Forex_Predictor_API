@@ -26,7 +26,7 @@ import json
 import logging
 import random
 from datetime import datetime, timedelta, timezone
-from typing import Awaitable, Callable, Iterable
+from typing import TYPE_CHECKING, Awaitable, Callable, Iterable
 
 import websockets
 from websockets.asyncio.client import ClientConnection
@@ -36,10 +36,66 @@ from app.core.config import Settings
 from app.features.realtime.schemas import CandleTick
 from app.shared.ohlcv.pair_normalizer import display_pair, normalize_pair
 
+if TYPE_CHECKING:  # pragma: no cover
+    from fastapi import FastAPI
+
 logger = logging.getLogger(__name__)
 
 # Callback type the route/broadcast layer registers to receive ticks.
 OnTickCallback = Callable[[CandleTick], Awaitable[None]]
+
+
+async def start_kraken_if_needed(app: "FastAPI") -> None:
+    """
+    Lazily start the Kraken WebSocket client if it has not been started yet.
+
+    Called from the ``ws_stream`` endpoint when the first frontend client
+    requests a real-time stream.  Creates the singleton ``KrakenWSClient``
+    instance, wires the ``ConnectionManager`` broadcast sink, and starts
+    the background task.
+
+    If the client is already running, this is a no-op.  If the client
+    fails to start, a warning is logged but the downstream connection
+    is allowed to proceed (the upstream may reconnect later).
+    """
+    if getattr(app.state, "kraken_ws_client", None) is not None:
+        return
+
+    from app.features.realtime.connection_manager import ConnectionManager
+
+    settings = Settings()
+
+    # Ensure ConnectionManager exists (may already be set by lifespan).
+    manager = getattr(app.state, "connection_manager", None)
+    if manager is None:
+        manager = ConnectionManager(settings=settings)
+        app.state.connection_manager = manager
+
+    client = KrakenWSClient(
+        settings=settings,
+        subscriptions=settings.ws_relay_subscriptions,
+        on_tick=manager.broadcast,
+    )
+    app.state.kraken_ws_client = client
+    app.state.realtime_health = {
+        "kraken_connected": False,
+        "last_tick_at": None,
+        "reconnect_count": 0,
+        "subscriptions": [
+            {"pair": pair, "interval": interval}
+            for pair, interval in sorted(client.active_subscriptions)
+        ],
+        "kraken_started": True,
+    }
+
+    try:
+        await client.start()
+        logger.debug(
+            "event=kraken_lazy_start subscriptions=%d",
+            len(client.active_subscriptions),
+        )
+    except Exception as error:
+        logger.warning("event=kraken_lazy_start_failed error=%s", error)
 
 
 class KrakenWSClient:

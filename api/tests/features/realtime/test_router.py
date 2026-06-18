@@ -27,10 +27,26 @@ def _settings(**overrides) -> Settings:
     return Settings(**base)
 
 
-def _build_app(settings: Settings) -> FastAPI:
+def _build_app(settings: Settings, monkeypatch: pytest.MonkeyPatch) -> FastAPI:
     """Stand up a minimal FastAPI app with a manually-wired manager."""
+    # Stub out lazy startup so tests don't create real KrakenWSClient.
+    async def _noop_start_kraken(_app) -> None:
+        pass
+
+    monkeypatch.setattr(
+        "app.features.realtime.router.start_kraken_if_needed",
+        _noop_start_kraken,
+    )
     app = FastAPI()
     app.state.connection_manager = ConnectionManager(settings=settings)
+    app.state.kraken_ws_client = None
+    app.state.realtime_health = {
+        "kraken_connected": False,
+        "last_tick_at": None,
+        "reconnect_count": 0,
+        "subscriptions": [],
+        "kraken_started": False,
+    }
     app.include_router(realtime_router, prefix="/api/v1/ws")
     return app
 
@@ -49,9 +65,9 @@ def _make_tick(pair: str = "XXBTZUSD", interval: int = 1) -> CandleTick:
     )
 
 
-def test_ws_route_reachable_at_full_path() -> None:
+def test_ws_route_reachable_at_full_path(monkeypatch: pytest.MonkeyPatch) -> None:
     """The composite URL `/api/v1/ws/stream` should accept upgrades."""
-    app = _build_app(_settings())
+    app = _build_app(_settings(), monkeypatch)
     with TestClient(app) as client:
         with client.websocket_connect(
             "/api/v1/ws/stream", headers={"origin": "http://localhost:3000"}
@@ -61,9 +77,9 @@ def test_ws_route_reachable_at_full_path() -> None:
             assert ack == {"type": "pong"}
 
 
-def test_ws_route_rejects_disallowed_origin() -> None:
+def test_ws_route_rejects_disallowed_origin(monkeypatch: pytest.MonkeyPatch) -> None:
     """Origins outside the allowlist must be rejected with code 1008."""
-    app = _build_app(_settings())
+    app = _build_app(_settings(), monkeypatch)
     with TestClient(app) as client:
         with pytest.raises(Exception):
             with client.websocket_connect(
@@ -73,9 +89,9 @@ def test_ws_route_rejects_disallowed_origin() -> None:
                 pass
 
 
-def test_ws_route_broadcasts_tick_via_manager() -> None:
+def test_ws_route_broadcasts_tick_via_manager(monkeypatch: pytest.MonkeyPatch) -> None:
     """A tick broadcast through the manager should reach the connected client."""
-    app = _build_app(_settings())
+    app = _build_app(_settings(), monkeypatch)
     with TestClient(app) as client:
         with client.websocket_connect(
             "/api/v1/ws/stream", headers={"origin": "http://localhost:3000"}

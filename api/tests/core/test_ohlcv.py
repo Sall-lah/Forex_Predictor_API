@@ -55,10 +55,10 @@ async def test_fetch_ohlcv_data_query_params(mocker) -> None:
     assert params["since"] == expected_since
 
 
-def test_from_provider_response_parses_payload_and_drops_incomplete_latest_candle() -> (
+def test_from_provider_response_parses_payload_and_keeps_all_candles() -> (
     None
 ):
-    """Provider should normalize OHLCV columns and drop incomplete tail row."""
+    """Provider should normalize OHLCV columns and keep all candles including incomplete."""
     base_time = 1711000000
     payload = {
         "error": [],
@@ -93,11 +93,6 @@ def test_from_provider_response_parses_payload_and_drops_incomplete_latest_candl
     preprocessed = client._preprocess_payload(payload, "XXBTZUSD")
     parsed = OHLCVDataFrame.from_provider_response(preprocessed)
 
-    # 1st candle has timestamp 1711000000. 
-    # last_completed_candle is 1711000000, which means the 2nd candle (1711003600) is incomplete.
-    # Actually wait: "last" field in payload is base_time. The last candle has base_time + 3600.
-    # The provider drops the last candle because its timestamp doesn't match 'last'.
-
     assert list(parsed.df.columns) == [
         "timestamp",
         "open",
@@ -106,7 +101,8 @@ def test_from_provider_response_parses_payload_and_drops_incomplete_latest_candl
         "close",
         "volume",
     ]
-    assert len(parsed.df) == 1
+    # Both candles are kept, including the incomplete one
+    assert len(parsed.df) == 2
     assert pd.api.types.is_datetime64tz_dtype(parsed.df["timestamp"])
 
 
