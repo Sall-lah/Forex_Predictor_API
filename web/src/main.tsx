@@ -1,14 +1,17 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
+import { CandlesPage } from './pages/CandlesPage';
 import './index.css';
-import { Provider } from 'react-redux';
-import { store } from './store';
 
-ReactDOM.createRoot(document.getElementById('app')!).render(
+document.title = 'Forex Candles';
+
+const root = document.getElementById('app');
+if (!root) {
+  throw new Error('Missing #app root element');
+}
+
+ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <Provider store={store}>
-      <App />
-    </Provider>
+    <CandlesPage />
   </React.StrictMode>
 );

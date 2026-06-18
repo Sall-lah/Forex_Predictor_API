@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
+from starlette.types import ASGIApp
 
 from app.middleware.rate_limit.service import RateLimiterService
 
@@ -11,7 +12,7 @@ from app.middleware.rate_limit.service import RateLimiterService
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Applies rate-limit checks and emits contract-compliant headers."""
 
-    def __init__(self, app) -> None:  # type: ignore[no-untyped-def]
+    def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
         self._default_service = RateLimiterService()
 
@@ -24,6 +25,13 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[no-untyped-def]
         """Evaluate request quota and either continue or return 429."""
+        # WebSocket upgrades are not HTTP requests and must bypass the
+        # rate limiter. `BaseHTTPMiddleware` will mis-handle the
+        # non-HTTP scope otherwise.
+        scope_type = request.scope.get("type")
+        if scope_type == "websocket":
+            return await call_next(request)
+
         service = self._resolve_service(request)
         result = await service.evaluate(request)
         if result.is_exempt:

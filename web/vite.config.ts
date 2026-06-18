@@ -9,6 +9,25 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            if (err.code === 'ECONNREFUSED') {
+              console.error('\x1b[33m[proxy] Backend not running. Start with: npm run dev:api\x1b[0m');
+            }
+          });
+        },
+      },
+      '/ws': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        ws: true,
+        configure: (proxy) => {
+          proxy.on('error', (err) => {
+            if (err.code === 'ECONNREFUSED') {
+              console.error('\x1b[33m[proxy] Backend not running. Start with: npm run dev:api\x1b[0m');
+            }
+          });
+        },
       },
     },
   },

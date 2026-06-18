@@ -10,6 +10,7 @@ from fastapi import APIRouter
 
 from app.features.historic_data.router import router as historic_data_router
 from app.features.prediction.router import router as prediction_router
+from app.features.realtime.router import router as realtime_router
 
 api_router = APIRouter()
 
@@ -23,4 +24,10 @@ api_router.include_router(
     prediction_router,
     prefix="/prediction",
     tags=["Prediction"],
+)
+
+api_router.include_router(
+    realtime_router,
+    prefix="/ws",
+    tags=["Realtime"],
 )
