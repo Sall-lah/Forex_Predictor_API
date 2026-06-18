@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     # WebSocket broadcast / consumer settings
     WS_BROADCAST_QUEUE_SIZE: int = 64
     WS_SLOW_CLIENT_OVERFLOW_THRESHOLD: int = 10
+    # Idle window (seconds) after which the sender emits a keepalive pong.
+    # Default 20s gives the frontend 35s silence watchdog ~1.75x headroom.
+    WS_KEEPALIVE_TIMEOUT_S: float = 20.0
 
     # Relay subscriptions - encoded as JSON list of {"pair": str, "interval": int}
     # Parsed in @property ws_relay_subscriptions.

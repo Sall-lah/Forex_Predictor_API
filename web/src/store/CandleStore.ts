@@ -123,6 +123,7 @@ export class CandleStore {
     this.lastUpdatedAt = null;
     this.publish();
     this.listeners.clear();
+    this.destroyed = false;
   }
 
   /**

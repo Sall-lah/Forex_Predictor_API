@@ -22,6 +22,32 @@ import { get } from '../services/apiClient';
 
 const POLL_INTERVAL_MS = 15_000;
 
+interface HistoricDataRecord {
+  timestamp: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+interface HistoricDataResponse {
+  symbol: string;
+  total_records: number;
+  data: HistoricDataRecord[];
+}
+
+function toCandles(resp: HistoricDataResponse): Candle[] {
+  return resp.data.map((r) => ({
+    time: Math.floor(new Date(r.timestamp).getTime() / 1000),
+    open: r.open,
+    high: r.high,
+    low: r.low,
+    close: r.close,
+    volume: r.volume,
+  }));
+}
+
 export interface UseCandlesResult {
   candles: readonly Candle[];
   status: LiveStatus;
@@ -45,11 +71,11 @@ export function useCandles(pair: string, interval: number): UseCandlesResult {
           interval: String(interval),
           count: '180',
         });
-        const data = await get<Candle[]>(
+        const resp = await get<HistoricDataResponse>(
           `/historic-data/live?${params.toString()}`
         );
         if (cancelled) return;
-        candleStore.setCandles(data);
+        candleStore.setCandles(toCandles(resp));
         setError(null);
       } catch (err) {
         if (cancelled) return;

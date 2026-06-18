@@ -3,7 +3,7 @@
  * `Chart`, `StatusBar`, and `ReconnectingBanner` and owns the
  * `useCandles` hook that drives the data layer.
  *
- * On unmount the page calls `candleStore.destroy()` so the underlying
+ * On unmount the page calls `liveFeed.detach()` so the underlying
  * WebSocket is closed cleanly and any pending timers are cancelled.
  */
 
@@ -12,7 +12,7 @@ import { Chart } from '../components/Chart';
 import { StatusBar } from '../components/StatusBar';
 import { ReconnectingBanner } from '../components/ReconnectingBanner';
 import { useCandles } from '../hooks/useCandles';
-import { candleStore } from '../store';
+import { candleStore, liveFeed } from '../store';
 import { colors, spacing } from '../design/tokens';
 
 const SUPPORTED_PAIRS = ['BTC/USD', 'ETH/USD'] as const;
@@ -29,7 +29,7 @@ export const CandlesPage: React.FC = () => {
 
   useEffect(() => {
     return () => {
-      candleStore.destroy();
+      liveFeed.detach();
     };
   }, []);
 

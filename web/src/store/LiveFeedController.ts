@@ -1,19 +1,23 @@
 /**
  * `LiveFeedController` owns the WebSocket connection to the backend
- * `/ws/candles` endpoint and translates incoming messages into
+ * `/api/v1/ws/stream` endpoint and translates incoming messages into
  * `candleStore` updates.
  *
  * Responsibilities
  * ----------------
  * - Open exactly one WebSocket per `(pair, interval)` change; the
  *   previous socket is closed with code `1000` before a new one opens.
- * - Dispatch `{ type: 'tick', candle }` messages via
- *   `candleStore.applyTick()`.
+ * - Dispatch candle tick messages via `candleStore.applyTick()`. The
+ *   backend `ConnectionManager._sender_loop` sends the unwrapped
+ *   `CandleTick` payload (no `{ type: "tick", candle }` wrapper); the
+ *   controller also accepts the wrapped form for forward-compat.
  * - Dispatch `{ type: 'status', status }` messages via
  *   `candleStore.setStatus()`.
- * - Treat 3 seconds of silence on an open socket as a dropped
+ * - Treat 35 seconds of silence on an open socket as a dropped
  *   connection: close the socket and switch the store to
- *   `'reconnecting'`.
+ *   `'reconnecting'`. The 35s threshold (with a 20s backend
+ *   keepalive pong) gives ~1.75x headroom so the watchdog does not
+ *   fire during legitimate quiet market periods.
  * - Reconnect with exponential back-off
  *   `1s -> 2s -> 4s -> 8s -> 16s -> 30s` (capped at 30 s) and reset
  *   the counter on a successful `'open'`.
@@ -23,15 +27,14 @@ import type { CandleStore } from './CandleStore';
 import type { Candle, LiveStatus } from './types';
 
 const BACKOFF_SCHEDULE_MS = [1000, 2000, 4000, 8000, 16000, 30000];
-const SILENCE_THRESHOLD_MS = 3000;
+const SILENCE_THRESHOLD_MS = 35000;
 
 function buildWsUrl(pair: string, interval: number): string {
   const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:'
     ? 'wss:'
     : 'ws:';
   const host = typeof window !== 'undefined' ? window.location.host : 'localhost:3000';
-  const params = new URLSearchParams({ pair, interval: String(interval) });
-  return `${protocol}//${host}/ws/candles?${params.toString()}`;
+  return `${protocol}//${host}/api/v1/ws/stream`;
 }
 
 export class LiveFeedController {
@@ -49,10 +52,10 @@ export class LiveFeedController {
   }
 
   attach(pair: string, interval: number): void {
-    if (this.destroyed) return;
     if (this.activePair === pair && this.activeInterval === interval && this.currentSocket) {
       return;
     }
+    this.destroyed = false;
 
     this.detachSocket(1000);
     this.activePair = pair;
@@ -96,6 +99,7 @@ export class LiveFeedController {
     this.store.setStatus('open');
     this.clearSilenceTimer();
     this.silenceTimer = setTimeout(() => this.onSilenceTimeout(), SILENCE_THRESHOLD_MS);
+    this.sendSubscribe();
   };
 
   private handleMessage = (event: MessageEvent): void => {
@@ -129,18 +133,75 @@ export class LiveFeedController {
     }
   };
 
+  private sendSubscribe(): void {
+    if (!this.currentSocket || this.currentSocket.readyState !== WebSocket.OPEN) return;
+    if (!this.activePair || this.activeInterval === null) return;
+    try {
+      this.currentSocket.send(JSON.stringify({
+        action: 'subscribe',
+        pair: this.activePair,
+        interval: this.activeInterval,
+      }));
+    } catch {
+      // ignore — the close handler will schedule a reconnect
+    }
+  }
+
   private dispatch(payload: unknown): void {
     if (!payload || typeof payload !== 'object') {
       console.warn('live-feed: non-object payload', payload);
       return;
     }
-    const message = payload as { type?: string; candle?: Candle; status?: LiveStatus };
+    const message = payload as {
+      type?: string;
+      candle?: Candle;
+      status?: LiveStatus;
+      pair?: string;
+      timestamp?: string | number;
+      open?: number;
+      high?: number;
+      low?: number;
+      close?: number;
+      volume?: number;
+    };
+    // Wrapped tick: { type: 'tick', candle: {...} }
     if (message.type === 'tick' && message.candle) {
       this.store.applyTick(message.candle);
       return;
     }
+    // Status update from backend (e.g. on reconnect replay).
     if (message.type === 'status' && message.status) {
       this.store.setStatus(message.status);
+      return;
+    }
+    // Backend keepalive pong: silence timer is already reset in
+    // handleMessage; just acknowledge silently.
+    if (message.type === 'pong') {
+      return;
+    }
+    // Unwrapped tick: backend sends CandleTick.model_dump() directly
+    // (no `type` wrapper). Detect by the presence of OHLC fields.
+    if (
+      message.pair &&
+      message.timestamp !== undefined &&
+      typeof message.open === 'number' &&
+      typeof message.high === 'number' &&
+      typeof message.low === 'number' &&
+      typeof message.close === 'number' &&
+      typeof message.volume === 'number'
+    ) {
+      const ts =
+        typeof message.timestamp === 'number'
+          ? message.timestamp
+          : Math.floor(new Date(message.timestamp).getTime() / 1000);
+      this.store.applyTick({
+        time: ts,
+        open: message.open,
+        high: message.high,
+        low: message.low,
+        close: message.close,
+        volume: message.volume,
+      });
       return;
     }
     console.warn('live-feed: unknown message', payload);

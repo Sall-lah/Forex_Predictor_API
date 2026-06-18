@@ -211,26 +211,25 @@ class KrakenWSClient:
         """Re-send every active subscription after (re)connect."""
         if not self._subscriptions:
             return
-        # Group subscriptions by pair to keep the wire payload small.
-        by_pair: dict[str, list[int]] = {}
-        for canonical_pair, interval in self._subscriptions:
-            by_pair.setdefault(canonical_pair, []).append(interval)
-        for canonical_pair, intervals in by_pair.items():
+        # Kraken v2 requires `interval` to be a scalar integer per subscribe
+        # call, so we send one message per (pair, interval) tuple instead of
+        # bundling multiple intervals into a list.
+        for canonical_pair, interval in sorted(self._subscriptions):
             display = display_pair(canonical_pair)
             payload = {
                 "method": "subscribe",
                 "params": {
                     "channel": "ohlc",
                     "symbol": [display],
-                    "interval": intervals[0] if len(intervals) == 1 else intervals,
+                    "interval": interval,
                 },
             }
             await ws.send(json.dumps(payload))
             logger.info(
-                "event=kraken_resubscribe pair=%s display=%s intervals=%s",
+                "event=kraken_resubscribe pair=%s display=%s interval=%d",
                 canonical_pair,
                 display,
-                intervals,
+                interval,
             )
 
     async def subscribe(self, pair: str, interval: int) -> None:

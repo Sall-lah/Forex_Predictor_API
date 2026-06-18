@@ -4,11 +4,11 @@
   "private": true,
   "scripts": {
     "install:all": "npm install --prefix web",
-    "dev:api": "cd api && conda run -n forex_prediction uvicorn app.main:app --reload --port 8000",
+    "dev:api": "cd api && conda run --no-capture-output -n forex_prediction uvicorn app.main:app --reload --port 8000",
     "dev:web": "npm run dev --prefix web",
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
     "start": "concurrently \"npm run start:api\" \"npm run start:web\"",
-    "start:api": "cd api && conda run -n forex_prediction uvicorn app.main:app --host 0.0.0.0 --port 8000",
+    "start:api": "cd api && conda run --no-capture-output -n forex_prediction uvicorn app.main:app --host 0.0.0.0 --port 8000",
     "start:web": "node web/server.js"
   },
   "_notes": "Do NOT pass --workers to uvicorn. The realtime relay must run in a single uvicorn worker; multi-worker support is out of scope (see openspec/changes/realtime-websocket-relay/design.md).",
