@@ -18,7 +18,6 @@ from app.core.exceptions import (
     ModelNotLoadedError,
 )
 from app.main import app
-from app.middleware.rate_limit.service import RateLimiterService
 from app.features.prediction.schemas import PredictionResponse
 
 
@@ -260,14 +259,6 @@ def test_predict_endpoint_model_not_loaded_error(client, mocker):
 def test_predict_endpoint_probability_range(client, mocker):
     """Test that probability_up is within valid range [0.0, 1.0]."""
     app.dependency_overrides.clear()
-    app.state.rate_limiter_service = RateLimiterService(
-        settings=Settings(
-            RATE_LIMIT_DEFAULT_CAPACITY=1000,
-            RATE_LIMIT_DEFAULT_REFILL_RATE_PER_SECOND=1000.0,
-            RATE_LIMIT_PREDICTION_CAPACITY=1000,
-            RATE_LIMIT_PREDICTION_REFILL_RATE_PER_SECOND=1000.0,
-        )
-    )
     # Mock service with edge case probabilities
     mock_service_class = mocker.patch(
         "app.features.prediction.router.PredictionService"

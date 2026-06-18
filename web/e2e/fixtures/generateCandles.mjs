@@ -1,6 +1,9 @@
 /**
  * Generate 180 deterministic OHLCV candles starting at a fixed UTC
  * timestamp. Used by the Playwright e2e suite.
+ *
+ * The shape matches the backend's `OHLCVRecord` schema:
+ *   { timestamp: ISO string, open, high, low, close, volume }
  */
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -26,7 +29,7 @@ for (let i = 0; i < COUNT; i += 1) {
   const low = Math.min(open, close) - 0.0005;
   const volume = 80 + (i % 30) * 3;
   candles.push({
-    time,
+    timestamp: new Date(time * 1000).toISOString(),
     open: round(open, 5),
     high: round(high, 5),
     low: round(low, 5),

@@ -12,7 +12,7 @@ import { Chart } from '../components/Chart';
 import { StatusBar } from '../components/StatusBar';
 import { ReconnectingBanner } from '../components/ReconnectingBanner';
 import { useCandles } from '../hooks/useCandles';
-import { candleStore, liveFeed } from '../store';
+import { liveFeed } from '../store';
 import { colors, spacing } from '../design/tokens';
 
 const SUPPORTED_PAIRS = ['BTC/USD', 'ETH/USD'] as const;

@@ -33,26 +33,9 @@ class Settings(BaseSettings):
     KRAKEN_OHLC_URL: str = "https://api.kraken.com/0/public/OHLC"
     KRAKEN_TIMEOUT: float = 15.0
 
-    # Kraken WebSocket relay settings
-    KRAKEN_WS_URL: str = "wss://ws.kraken.com/v2"
-    KRAKEN_WS_RECONNECT_BACKOFF_SECONDS: str = "1,2,4,8,16,30"
-    KRAKEN_WS_PING_INTERVAL: int = 20
-    KRAKEN_WS_PING_TIMEOUT: int = 20
-
-    # WebSocket broadcast / consumer settings
-    WS_BROADCAST_QUEUE_SIZE: int = 64
-    WS_SLOW_CLIENT_OVERFLOW_THRESHOLD: int = 10
-    # Idle window (seconds) after which the sender emits a keepalive pong.
-    # Default 20s gives the frontend 35s silence watchdog ~1.75x headroom.
-    WS_KEEPALIVE_TIMEOUT_S: float = 20.0
-
-    # Relay subscriptions - encoded as JSON list of {"pair": str, "interval": int}
+    # Trading subscriptions - encoded as JSON list of {"pair": str, "interval": int}
     # Parsed in @property ws_relay_subscriptions.
-    WS_RELAY_SUBSCRIPTIONS: str = "[]"
-
-    # CSWSH mitigation - explicit origin allowlist for the WS endpoint
-    # Comma-separated list of allowed origins.
-    WS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
+    TRADING_SUBSCRIPTIONS: str = "[]"
 
     # ML Model settings
     MODEL_DIR: str = "app/features/prediction/ml_models"
@@ -61,26 +44,6 @@ class Settings(BaseSettings):
     # Feature extraction settings
     PREDICTION_FETCH_CANDLES: int = 720
     MIN_ROWS_FOR_FEATURES: int = 168
-
-    # Rate limit defaults
-    RATE_LIMIT_DEFAULT_CAPACITY: int = 60
-    RATE_LIMIT_DEFAULT_REFILL_RATE_PER_SECOND: float = 1.0
-
-    # Endpoint-specific rate limits
-    RATE_LIMIT_PREDICTION_CAPACITY: int = 10
-    RATE_LIMIT_PREDICTION_REFILL_RATE_PER_SECOND: float = 10 / 60
-    RATE_LIMIT_HISTORICAL_CAPACITY: int = 100
-    RATE_LIMIT_HISTORICAL_REFILL_RATE_PER_SECOND: float = 100 / 60
-
-    # Storage safety controls
-    RATE_LIMIT_STORAGE_MAX_ENTRIES: int = 100000
-    RATE_LIMIT_STORAGE_TTL_SECONDS: int = 3600
-
-    # Proxy and path controls
-    RATE_LIMIT_TRUSTED_PROXY_IPS: str = ""
-    RATE_LIMIT_EXEMPT_PATHS: str = (
-        "/health,/docs,/redoc,/openapi.json,/api/v1/ws/stream"
-    )
 
     @property
     def model_path(self) -> Path:
@@ -91,24 +54,24 @@ class Settings(BaseSettings):
     @property
     def ws_relay_subscriptions(self) -> list[dict[str, int | str]]:
         """
-        Parse WS_RELAY_SUBSCRIPTIONS into a list of {pair, interval} dicts.
+        Parse TRADING_SUBSCRIPTIONS into a list of {pair, interval} dicts.
 
         Format on the wire: JSON list, e.g.
         '[{"pair": "BTC/USD", "interval": 1}]'.
         """
         import json
 
-        raw = (self.WS_RELAY_SUBSCRIPTIONS or "[]").strip()
+        raw = (self.TRADING_SUBSCRIPTIONS or "[]").strip()
         if not raw:
             return []
         try:
             parsed = json.loads(raw)
         except json.JSONDecodeError as error:
             raise ValueError(
-                f"Invalid WS_RELAY_SUBSCRIPTIONS JSON: {error}"
+                f"Invalid TRADING_SUBSCRIPTIONS JSON: {error}"
             ) from error
         if not isinstance(parsed, list):
-            raise ValueError("WS_RELAY_SUBSCRIPTIONS must be a JSON list")
+            raise ValueError("TRADING_SUBSCRIPTIONS must be a JSON list")
         cleaned: list[dict[str, int | str]] = []
         for entry in parsed:
             if not isinstance(entry, dict):
@@ -118,24 +81,6 @@ class Settings(BaseSettings):
             if isinstance(pair, str) and isinstance(interval, int):
                 cleaned.append({"pair": pair, "interval": interval})
         return cleaned
-
-    @property
-    def ws_allowed_origins(self) -> list[str]:
-        """Parse WS_ALLOWED_ORIGINS (comma-separated) into a list."""
-        return [
-            origin.strip()
-            for origin in (self.WS_ALLOWED_ORIGINS or "").split(",")
-            if origin.strip()
-        ]
-
-    @property
-    def kraken_ws_backoff_schedule(self) -> list[float]:
-        """Parse KRAKEN_WS_RECONNECT_BACKOFF_SECONDS (comma-separated) into floats."""
-        return [
-            float(value)
-            for value in (self.KRAKEN_WS_RECONNECT_BACKOFF_SECONDS or "").split(",")
-            if value.strip()
-        ]
 
     model_config = SettingsConfigDict(
         env_file=".env",

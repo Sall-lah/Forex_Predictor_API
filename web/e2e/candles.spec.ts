@@ -1,6 +1,7 @@
 /**
  * Initial render: the production build loads, the REST stub
- * returns the fixture candles, and the StatusBar shows the
+ * returns the fixture candles (and the subscription discovery stub
+ * returns a known set of pairs), and the StatusBar shows the
  * latest close.
  */
 
@@ -16,14 +17,35 @@ const candles = JSON.parse(
 );
 const lastClose = candles[candles.length - 1].close as number;
 
+const SUBSCRIPTIONS = {
+  subscriptions: [
+    { pair: 'BTC/USD', intervals: [1, 5, 15, 60, 240] },
+    { pair: 'ETH/USD', intervals: [1, 5, 15, 60, 240] },
+  ],
+};
+
+const HISTORIC_RESPONSE = {
+  symbol: 'BTC/USD',
+  total_records: candles.length,
+  data: candles,
+};
+
 test('initial render against the REST fixture', async ({ page }) => {
   await redirectWebSocketsToFixture(page);
+
+  await page.route('**/api/v1/subscriptions**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(SUBSCRIPTIONS),
+    });
+  });
 
   await page.route('**/api/v1/historic-data/live**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify(candles),
+      body: JSON.stringify(HISTORIC_RESPONSE),
     });
   });
 

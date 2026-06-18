@@ -1,21 +1,28 @@
 /**
- * Local WebSocket fixture used by the Playwright e2e suite.
+ * Local Kraken WebSocket v2 fixture used by the Playwright e2e suite.
  *
- * Uses Node 22's built-in `WebSocket` and `WebSocketServer` (no
- * external `ws` dependency) so the suite can run without an extra
- * `npm install`.
+ * Uses Node 22's built-in `WebSocket` server primitives (no external
+ * `ws` dependency) so the suite runs without an extra `npm install`.
  *
  * Behaviour:
  *   - Listens on port 5180 (override via WS_FIXTURE_PORT).
- *   - On every new connection, immediately pushes a single tick for
- *     the last candle in `candles.json` so the chart updates.
+ *   - The browser harness (`wsHarness.ts`) rewrites the page's
+ *     `wss://ws.kraken.com/v2` WebSocket connection to
+ *     `ws://localhost:5180` (no path) so the test browser can
+ *     communicate with this fixture.
+ *   - On every new connection, the fixture waits for a Kraken v2
+ *     subscribe message, then immediately pushes one OHLC update
+ *     using the last candle in `candles.json` so the chart appears
+ *     "live" without the test waiting on a real upstream.
  *   - Exposes a tiny HTTP control surface on the same port:
- *       POST /push-tick   { close: number, time?: number } -> pushes a tick
- *       POST /close       { code?: number }              -> drops all clients
- *       GET  /healthz                                   -> 200 OK
+ *       POST /push-tick   { symbol?, close: number, time?, interval? }
+ *                          -> pushes a Kraken v2 OHLC update frame
+ *       POST /close       { code?: number } -> drops all clients
+ *       GET  /healthz                       -> 200 OK
  *
  * The Playwright tests use these endpoints to simulate a dropped
- * socket (reconnect test) and to push a custom tick (live-tick test).
+ * socket (reconnect test), to push a custom tick (live-tick test),
+ * and to drive the Kraken subscribe/unsubscribe flow (pair-switch).
  */
 
 import http from 'node:http';
@@ -31,12 +38,10 @@ const candles = JSON.parse(
   readFileSync(join(__dirname, 'candles.json'), 'utf8')
 );
 const lastCandle = candles[candles.length - 1];
+const lastCandleTime = Math.floor(
+  new Date(lastCandle.timestamp).getTime() / 1000
+);
 
-/**
- * In-memory set of open WebSocket clients. We can't use the `ws`
- * package, so we implement the tiny server protocol by hand on top
- * of the Node `http` upgrade flow.
- */
 const clients = new Set();
 
 const server = http.createServer((req, res) => {
@@ -79,18 +84,32 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ detail: 'close (number) is required' }));
         return;
       }
-      const tick = {
-        type: 'tick',
-        candle: {
-          time: typeof parsed.time === 'number' ? parsed.time : lastCandle.time,
-          open: lastCandle.open,
-          high: Math.max(lastCandle.high, parsed.close),
-          low: Math.min(lastCandle.low, parsed.close),
-          close: parsed.close,
-          volume: lastCandle.volume + 1,
-        },
+      const symbol = typeof parsed.symbol === 'string' ? parsed.symbol : lastCandle.symbol || 'BTC/USD';
+      const interval = typeof parsed.interval === 'number' ? parsed.interval : 60;
+      const timeSeconds =
+        typeof parsed.time === 'number'
+          ? parsed.time
+          : (lastCandleTime ?? Math.floor(Date.now() / 1000));
+      const intervalBegin = new Date(timeSeconds * 1000).toISOString();
+      const high = Math.max(lastCandle.high ?? parsed.close, parsed.close);
+      const low = Math.min(lastCandle.low ?? parsed.close, parsed.close);
+      const frame = {
+        channel: 'ohlc',
+        type: 'update',
+        data: [
+          {
+            symbol,
+            interval,
+            interval_begin: intervalBegin,
+            open: String(lastCandle.open ?? parsed.close),
+            high: String(high),
+            low: String(low),
+            close: String(parsed.close),
+            volume: String((lastCandle.volume ?? 0) + 1),
+          },
+        ],
       };
-      broadcast(tick);
+      broadcast(frame);
       res.writeHead(204);
       res.end();
     });
@@ -101,8 +120,6 @@ const server = http.createServer((req, res) => {
 });
 
 server.on('upgrade', (req, socket, head) => {
-  // Lightweight WebSocket handshake. We do not parse extensions; the
-  // browser client only requires the basic upgrade flow.
   if (req.headers.upgrade?.toLowerCase() !== 'websocket') {
     socket.destroy();
     return;
@@ -126,17 +143,44 @@ server.on('upgrade', (req, socket, head) => {
   const client = wrapSocket(socket);
   clients.add(client);
 
-  // Push the immediate tick so the chart updates from "live" without
-  // the test having to wait for a real upstream.
-  const initialTick = {
-    type: 'tick',
-    candle: { ...lastCandle, close: lastCandle.close + 0.00010 },
-  };
-  try {
-    client.send(JSON.stringify(initialTick));
-  } catch {
-    // ignore
-  }
+  // After receiving a subscribe message, push a single tick using
+  // the last fixture candle. The pair/interval come from the
+  // subscribe message so the pair-switch test exercises the right
+  // values.
+  client.on('message', (raw) => {
+    let parsed = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    if (!parsed || parsed.method !== 'subscribe') return;
+    const params = parsed.params ?? {};
+    const symbol = Array.isArray(params.symbol) ? params.symbol[0] : 'BTC/USD';
+    const interval = typeof params.interval === 'number' ? params.interval : 60;
+    const intervalBegin = lastCandle.timestamp;
+    const initialFrame = {
+      channel: 'ohlc',
+      type: 'update',
+      data: [
+        {
+          symbol,
+          interval,
+          interval_begin: intervalBegin,
+          open: String(lastCandle.open),
+          high: String(Math.max(lastCandle.high, lastCandle.close + 0.0001)),
+          low: String(lastCandle.low),
+          close: String(lastCandle.close + 0.0001),
+          volume: String(lastCandle.volume + 1),
+        },
+      ],
+    };
+    try {
+      client.send(JSON.stringify(initialFrame));
+    } catch {
+      // ignore
+    }
+  });
 });
 
 function broadcast(payload) {
@@ -163,24 +207,10 @@ function safeJson(text) {
  * frame), `close`, and a 'message' callback wired from data frames.
  *
  * Frame format reference: RFC 6455. We only emit / consume small
- * text frames (opcode 0x1) and ignore everything else.
+ * text frames (opcode 0x1) and close frames (opcode 0x8).
  */
 function wrapSocket(socket) {
   const handlers = { message: null, close: null };
-  socket.on('data', (chunk) => {
-    handleFrame(chunk, socket, handlers);
-  });
-  socket.on('close', () => {
-    clients.delete(api);
-    if (handlers.close) handlers.close();
-  });
-  socket.on('error', () => {
-    try {
-      socket.destroy();
-    } catch {
-      // ignore
-    }
-  });
   const api = {
     send(text) {
       const payload = Buffer.from(text, 'utf8');
@@ -214,10 +244,24 @@ function wrapSocket(socket) {
       handlers[name] = fn;
     },
   };
+  socket.on('data', (chunk) => {
+    handleFrame(chunk, socket, handlers, api);
+  });
+  socket.on('close', () => {
+    clients.delete(api);
+    if (handlers.close) handlers.close();
+  });
+  socket.on('error', () => {
+    try {
+      socket.destroy();
+    } catch {
+      // ignore
+    }
+  });
   return api;
 }
 
-function handleFrame(chunk, socket, handlers) {
+function handleFrame(chunk, socket, handlers, api) {
   if (chunk.length < 2) return;
   const opcode = chunk[0] & 0x0f;
   let offset = 2;
@@ -234,7 +278,6 @@ function handleFrame(chunk, socket, handlers) {
   if (opcode === 0x1 && handlers.message) {
     handlers.message(payload);
   } else if (opcode === 0x8) {
-    // close frame
     if (handlers.close) handlers.close();
     try {
       socket.end();
@@ -253,7 +296,7 @@ function createAcceptValue(key) {
 }
 
 server.listen(PORT, () => {
-  console.log(`wsServer listening on http://localhost:${PORT}`);
-  console.log(`  - WS at ws://localhost:${PORT}/ws/candles?...`);
+  console.log(`krakenWsServer listening on http://localhost:${PORT}`);
+  console.log(`  - WS at ws://localhost:${PORT} (Kraken v2 protocol)`);
   console.log(`  - HTTP control surface: /healthz, /push-tick, /close`);
 });

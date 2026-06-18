@@ -4,11 +4,13 @@
  * Two background services are launched for the test run:
  *   1. `vite preview` serves the production build on port 4173 (the
  *      test runner's baseURL).
- *   2. `node e2e/fixtures/wsServer.mjs` runs the WebSocket fixture
- *      on port 5180.
+ *   2. `node e2e/fixtures/wsServer.mjs` runs the local Kraken v2
+ *      WebSocket fixture on port 5180. The browser-side tests
+ *      redirect `wss://ws.kraken.com/v2` to `ws://localhost:5180`
+ *      via the init-script helper in `e2e/fixtures/wsHarness.ts`.
  *
- * The browser-side tests redirect `/ws/candles` to the fixture
- * server via the init-script helper in `e2e/fixtures/wsHarness.ts`.
+ * The backend REST API is mocked in-test via `page.route()` for
+ * `/api/v1/historic-data/live` and `/api/v1/subscriptions`.
  */
 
 import { defineConfig, devices } from '@playwright/test';

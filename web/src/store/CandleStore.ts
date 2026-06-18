@@ -99,6 +99,19 @@ export class CandleStore {
     this.publish();
   }
 
+  /**
+   * Replace the current candle series. Used when the active
+   * pair/interval changes and the existing series is no longer
+   * relevant. Unlike `setCandles`, this does NOT merge.
+   */
+  replaceCandles(candles: readonly Candle[]): void {
+    const next = candles.slice().sort((a, b) => a.time - b.time);
+    if (candlesEqual(this.candles, next)) return;
+    this.candles = next;
+    this.lastUpdatedAt = Date.now();
+    this.publish();
+  }
+
   applyTick(candle: Candle): void {
     const next = normalise([...this.candles, candle]);
     if (candlesEqual(this.candles, next)) return;
