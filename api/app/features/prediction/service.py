@@ -16,12 +16,12 @@ import logging
 import pickle
 import threading
 from datetime import datetime, timezone, timedelta
-from typing import Any, Literal
+from typing import Any
 
 import joblib
 import numpy as np
 import pandas as pd
-from pydantic import ValidationError
+from ta import momentum, trend, volatility
 
 from app.core.config import get_settings
 from app.core.exceptions import (
@@ -32,19 +32,8 @@ from app.core.exceptions import (
 )
 from app.features.prediction.schemas import PredictionRequest, PredictionResponse
 from app.shared.ohlcv import KrakenProvider, OHLCVDataFrame
-from ta import momentum, trend, volatility
-
-from app.core.config import get_settings
 
 settings = get_settings()
-from app.core.exceptions import (
-    DataValidationError,
-    InsufficientDataError,
-    ModelNotLoadedError,
-)
-from app.shared.ohlcv import OHLCVDataFrame
-from app.features.prediction.schemas import PredictionRequest, PredictionResponse
-from app.shared.ohlcv import OHLCVDataFrame, DataProvider, get_provider
 
 logger = logging.getLogger(__name__)
 

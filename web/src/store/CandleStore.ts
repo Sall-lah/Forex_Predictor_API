@@ -127,6 +127,20 @@ export class CandleStore {
   }
 
   /**
+   * Synchronously wipe the candle series without touching `status` or
+   * the live WebSocket lifecycle. Publishes a new snapshot only on a
+   * transition from populated to empty; calls on an already-cleared
+   * store are no-ops, matching the `setCandles` / `replaceCandles` /
+   * `applyTick` publish pattern.
+   */
+  clear(): void {
+    if (this.candles.length === 0 && this.lastUpdatedAt === null) return;
+    this.candles = EMPTY_SNAPSHOT.candles;
+    this.lastUpdatedAt = null;
+    this.publish();
+  }
+
+  /**
    * Tear-down hook used by the page-level `useEffect` cleanup. Closes
    * any registered WebSocket through the bound controller and clears
    * timers.

@@ -31,16 +31,15 @@ async def get_subscriptions() -> SubscriptionResponse:
     """
     Return configured trading pair subscriptions.
 
-    Parses the TRADING_SUBSCRIPTIONS (or WS_RELAY_SUBSCRIPTIONS) env var
-    and groups intervals by pair.
+    Parses the TRADING_SUBSCRIPTIONS env var and groups intervals by pair.
     """
     raw = settings.ws_relay_subscriptions
 
     # Group by pair
     pairs_map: dict[str, list[int]] = {}
     for entry in raw:
-        pair = str(entry["pair"])
-        interval = int(entry["interval"])
+        pair = entry["pair"]
+        interval = entry["interval"]
         pairs_map.setdefault(pair, []).append(interval)
 
     subscriptions = [

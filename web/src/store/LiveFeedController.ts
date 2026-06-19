@@ -90,6 +90,8 @@ export class LiveFeedController {
       this.currentSocket !== null;
     if (sameTarget) return Promise.resolve();
 
+    this.store.setStatus('connecting');
+    this.store.clear();
     this.detachSocket(1000);
     this.activePair = pair;
     this.activeInterval = interval;
@@ -104,6 +106,7 @@ export class LiveFeedController {
     this.detachSocket(1000);
     this.activePair = null;
     this.activeInterval = null;
+    this.store.clear();
     this.store.setStatus('closed');
   }
 
@@ -165,6 +168,7 @@ export class LiveFeedController {
   private handleOpen = (): void => {
     this.attempt = 0;
     this.store.setStatus('open');
+    console.log(`[ws] connected to ${this.activePair}@${this.activeInterval}m`);
     this.clearSilenceTimer();
     this.silenceTimer = setTimeout(() => this.onSilenceTimeout(), SILENCE_THRESHOLD_MS);
     this.sendSubscribe();
@@ -186,9 +190,14 @@ export class LiveFeedController {
   private handleClose = (event: CloseEvent): void => {
     this.clearSilenceTimer();
     if (event.code === 1000) {
+      // If a new attach is in progress, it has already set 'connecting'.
+      // Don't override it with 'closed'.
+      if (this.activePair !== null) return;
+      console.log('[ws] disconnected');
       this.store.setStatus('closed');
       return;
     }
+    console.log(`[ws] connection lost (code: ${event.code}), reconnecting...`);
     this.store.setStatus('reconnecting');
     this.scheduleReconnect();
   };
@@ -234,6 +243,7 @@ export class LiveFeedController {
     if (message.channel === 'ohlc' && message.type === 'update' && Array.isArray(message.data)) {
       const candle = parseKrakenOhlc(message.data[0]);
       if (candle) {
+        console.log('[ws] OHLC tick', candle);
         this.store.applyTick(candle);
         return;
       }
@@ -261,11 +271,11 @@ export class LiveFeedController {
       if (this.destroyed || this.activePair !== pair || this.activeInterval !== interval) {
         return;
       }
+      this.store.clear();
       this.store.replaceCandles(candles);
+      console.log(`[ws] history loaded: ${candles.length} candles for ${pair}@${interval}m`);
     } catch (error) {
-      if (typeof console !== 'undefined') {
-        console.warn('live-feed: history fetch failed, continuing with WS only', error);
-      }
+      console.warn(`[ws] history fetch failed for ${pair}@${interval}m, continuing with WS only`, error);
     }
 
     if (this.destroyed || this.activePair !== pair || this.activeInterval !== interval) {

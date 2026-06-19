@@ -5,12 +5,15 @@ Verifies:
 - GET /api/v1/subscriptions returns configured pairs
 - Response schema matches SubscriptionResponse
 - Empty config returns empty list
+- ws_relay_subscriptions property returns fully typed data
 """
 
 import json
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+
+from app.core.config import Settings, get_settings
 
 
 def test_subscriptions_returns_configured_pairs(client: TestClient) -> None:
@@ -74,3 +77,40 @@ def test_subscriptions_schema_structure(client: TestClient) -> None:
     assert "intervals" in sub
     assert isinstance(sub["pair"], str)
     assert isinstance(sub["intervals"], list)
+
+
+def test_ws_relay_subscriptions_is_fully_typed(
+    monkeypatch: "pytest.MonkeyPatch",
+) -> None:
+    """ws_relay_subscriptions returns list[dict[str, int | str]] with strict types.
+
+    This contract test pins the property's type guarantees so that
+    the router's removal of defensive str()/int() casts is safe.
+    """
+    test_json = '[{"pair": "BTC/USD", "interval": 1}, {"pair": "BTC/USD", "interval": 5}]'
+    get_settings.cache_clear()
+    try:
+        settings = Settings(TRADING_SUBSCRIPTIONS=test_json)
+        result = settings.ws_relay_subscriptions
+
+        assert isinstance(result, list)
+        assert len(result) == 2
+        for entry in result:
+            assert isinstance(entry, dict)
+            assert isinstance(entry["pair"], str)
+            assert isinstance(entry["interval"], int)
+
+        # Also verify the lru_cache singleton path (what the router actually uses)
+        get_settings.cache_clear()
+        cached_settings = get_settings()
+        cached_settings.TRADING_SUBSCRIPTIONS = test_json
+        cached_result = cached_settings.ws_relay_subscriptions
+
+        assert isinstance(cached_result, list)
+        assert len(cached_result) == 2
+        for entry in cached_result:
+            assert isinstance(entry, dict)
+            assert isinstance(entry["pair"], str)
+            assert isinstance(entry["interval"], int)
+    finally:
+        get_settings.cache_clear()

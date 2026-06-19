@@ -6,8 +6,6 @@ Models:
 - SubscriptionResponse: Response with all configured subscriptions
 """
 
-from typing import List
-
 from pydantic import BaseModel, Field
 
 
@@ -21,7 +19,7 @@ class SubscriptionPair(BaseModel):
         description="Trading pair symbol",
         examples=["BTC/USD"],
     )
-    intervals: List[int] = Field(
+    intervals: list[int] = Field(
         ...,
         description="OHLC interval minutes to subscribe to",
         examples=[[1, 5, 15, 60, 240]],
@@ -35,7 +33,7 @@ class SubscriptionResponse(BaseModel):
     The frontend uses this to know which Kraken WS channels to open.
     """
 
-    subscriptions: List[SubscriptionPair] = Field(
+    subscriptions: list[SubscriptionPair] = Field(
         ...,
         description="Configured trading pair subscriptions",
     )

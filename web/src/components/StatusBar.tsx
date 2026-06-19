@@ -8,15 +8,8 @@
 import { useSyncExternalStore } from 'react';
 import { candleStore } from '../store';
 import type { Candle, LiveStatus } from '../store';
+import { STATUS_LABEL } from '../store/statusLabels';
 import { colors, fontSizes, fontWeights, spacing } from '../design/tokens';
-
-const STATUS_LABEL: Record<LiveStatus, string> = {
-  idle: 'Idle',
-  connecting: 'Connecting',
-  open: 'Live',
-  closed: 'Closed',
-  reconnecting: 'Reconnecting',
-};
 
 const STATUS_COLOR: Record<LiveStatus, string> = {
   idle: colors.textMuted,

@@ -2,7 +2,6 @@
 
 import logging
 
-# from app.core.exceptions import DataFetchError, DataValidationError, InsufficientDataError
 from app.features.historic_data.schemas import HistoricDataRequest, HistoricDataResponse, OHLCVRecord
 from app.shared.ohlcv import OHLCVDataFrame, DataProvider, get_provider
 

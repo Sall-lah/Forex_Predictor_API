@@ -25,7 +25,19 @@ export const CandlesPage: React.FC = () => {
   const [pair, setPair] = useState<SupportedPair>('BTC/USD');
   const [interval, setInterval] = useState<SupportedInterval>(60);
 
-  const { status, error } = useCandles(pair, interval);
+  const { status } = useCandles(pair, interval);
+  const isLive = status === 'open';
+
+  const controlsLabel =
+    status === 'idle'
+      ? null
+      : status === 'connecting'
+        ? 'Connecting…'
+        : status === 'reconnecting'
+          ? 'Reconnecting…'
+          : status === 'closed'
+            ? 'Closed'
+            : null;
 
   useEffect(() => {
     return () => {
@@ -78,7 +90,8 @@ export const CandlesPage: React.FC = () => {
             data-testid="pair-select"
             value={pair}
             onChange={(e) => setPair(e.target.value as SupportedPair)}
-            style={selectStyle}
+            disabled={!isLive}
+            style={isLive ? selectStyle : disabledSelectStyle}
           >
             {SUPPORTED_PAIRS.map((p) => (
               <option key={p} value={p}>
@@ -93,7 +106,8 @@ export const CandlesPage: React.FC = () => {
             onChange={(e) =>
               setInterval(Number(e.target.value) as SupportedInterval)
             }
-            style={selectStyle}
+            disabled={!isLive}
+            style={isLive ? selectStyle : disabledSelectStyle}
           >
             {SUPPORTED_INTERVALS.map((i) => (
               <option key={i} value={i}>
@@ -101,26 +115,25 @@ export const CandlesPage: React.FC = () => {
               </option>
             ))}
           </select>
+          {controlsLabel && (
+            <span
+              data-testid="controls-status"
+              role="status"
+              aria-live="polite"
+              style={{
+                opacity: 0.5,
+                fontSize: 12,
+                color: colors.textMuted,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {controlsLabel}
+            </span>
+          )}
         </nav>
       </header>
 
       <ReconnectingBanner />
-
-      {error && (
-        <div
-          data-testid="error-banner"
-          style={{
-            background: colors.bear,
-            color: '#000',
-            padding: `${spacing.xs}px ${spacing.md}px`,
-            borderRadius: 6,
-            marginBottom: spacing.sm,
-            fontWeight: 600,
-          }}
-        >
-          {error.message}
-        </div>
-      )}
 
       <div
         data-testid="status-bar-container"
@@ -164,4 +177,10 @@ const selectStyle: React.CSSProperties = {
   padding: '6px 10px',
   fontFamily: 'Inter, sans-serif',
   fontSize: 13,
+};
+
+const disabledSelectStyle: React.CSSProperties = {
+  ...selectStyle,
+  opacity: 0.5,
+  cursor: 'not-allowed',
 };

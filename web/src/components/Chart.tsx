@@ -145,7 +145,17 @@ export const Chart: React.FC = () => {
       lastTickTimeRef.current = data[data.length - 1].time as number;
       return;
     }
-    if (data.length === 0) return;
+    if (data.length === 0) {
+      // Clear the visible series when the store is wiped (target change,
+      // reconnect, or unmount). Only act if the chart was previously
+      // initialised — a zero-candle snapshot before any data is a no-op.
+      if (initialisedRef.current) {
+        series.setData([]);
+        initialisedRef.current = false;
+        lastTickTimeRef.current = null;
+      }
+      return;
+    }
     const last = data[data.length - 1];
     if (lastTickTimeRef.current === null) {
       series.setData([...data]);

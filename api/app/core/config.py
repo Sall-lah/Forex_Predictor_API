@@ -7,6 +7,8 @@ Provides type-safe, validated config with automatic .env file loading.
 from functools import lru_cache
 from pathlib import Path
 
+import json
+
 from pydantic_settings import BaseSettings, SettingsConfigDict, PydanticBaseSettingsSource
 
 
@@ -33,8 +35,8 @@ class Settings(BaseSettings):
     KRAKEN_OHLC_URL: str = "https://api.kraken.com/0/public/OHLC"
     KRAKEN_TIMEOUT: float = 15.0
 
-    # Trading subscriptions - encoded as JSON list of {"pair": str, "interval": int}
-    # Parsed in @property ws_relay_subscriptions.
+    # Trading subscriptions - encoded as JSON list of {"pair": str, "interval": int}.
+    # Parsed in @property ws_relay_subscriptions below.
     TRADING_SUBSCRIPTIONS: str = "[]"
 
     # ML Model settings
@@ -59,8 +61,6 @@ class Settings(BaseSettings):
         Format on the wire: JSON list, e.g.
         '[{"pair": "BTC/USD", "interval": 1}]'.
         """
-        import json
-
         raw = (self.TRADING_SUBSCRIPTIONS or "[]").strip()
         if not raw:
             return []

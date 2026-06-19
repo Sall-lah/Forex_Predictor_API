@@ -1,8 +1,7 @@
-import { render } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Chart } from './Chart';
-import type { OHLCVData } from '../hooks/useMarketData';
-import type { CandleTick } from '../types';
+import { candleStore } from '../store';
 
 // Mock the lightweight-charts library so we can spy on setData / update
 // without instantiating a real chart canvas.
@@ -19,38 +18,79 @@ vi.mock('lightweight-charts', () => ({
   }),
 }));
 
-const sampleData: OHLCVData[] = [
-  { time: '2024-01-01T00:00:00Z', open: 1, high: 2, low: 0.5, close: 1.5, volume: 1 },
-];
+const CANDLE_1 = {
+  time: 1704067200,
+  open: 100,
+  high: 105,
+  low: 99,
+  close: 103,
+  volume: 10,
+};
 
-const sampleTick: CandleTick = {
-  pair: 'XXBTZUSD',
-  interval: 1,
-  timestamp: '2024-01-01T00:01:00Z',
-  open: 2,
-  high: 3,
-  low: 1.5,
-  close: 2.5,
-  volume: 1,
-  is_closed: false,
+const CANDLE_2 = {
+  time: 1704067260,
+  open: 103,
+  high: 108,
+  low: 102,
+  close: 106,
+  volume: 12,
 };
 
 describe('Chart', () => {
-  it('calls setData for the initial REST snapshot only', () => {
+  it('calls setData for the initial snapshot', () => {
     setDataMock.mockClear();
     updateMock.mockClear();
-    render(<Chart data={sampleData} liveTick={null} />);
-    expect(setDataMock).toHaveBeenCalled();
+    render(<Chart />);
+    // The initial snapshot is empty, so setData should not be called yet
+    expect(setDataMock).not.toHaveBeenCalled();
   });
 
-  it('calls series.update for a live tick, not setData', () => {
+  it('calls setData([]) and resets refs on a zero-candle snapshot after being populated', () => {
     setDataMock.mockClear();
     updateMock.mockClear();
-    const { rerender } = render(<Chart data={sampleData} liveTick={null} />);
+    render(<Chart />);
+
+    // Push a populated snapshot
+    act(() => {
+      candleStore.setCandles([CANDLE_1, CANDLE_2]);
+    });
+    expect(setDataMock).toHaveBeenCalled();
+
     setDataMock.mockClear();
-    rerender(<Chart data={sampleData} liveTick={sampleTick} />);
-    expect(updateMock).toHaveBeenCalled();
-    // setData should NOT be called again on a tick rerender.
-    expect(setDataMock).not.toHaveBeenCalled();
+    updateMock.mockClear();
+
+    // Push an empty snapshot (simulating a clear())
+    act(() => {
+      candleStore.clear();
+    });
+    expect(setDataMock).toHaveBeenCalledWith([]);
+  });
+
+  it('re-seeds via setData (not update) on the second populated snapshot after a clear', () => {
+    setDataMock.mockClear();
+    updateMock.mockClear();
+    render(<Chart />);
+
+    // Push first populated snapshot
+    act(() => {
+      candleStore.setCandles([CANDLE_1]);
+    });
+    setDataMock.mockClear();
+    updateMock.mockClear();
+
+    // Push empty snapshot (clear)
+    act(() => {
+      candleStore.clear();
+    });
+    setDataMock.mockClear();
+    updateMock.mockClear();
+
+    // Push second populated snapshot
+    act(() => {
+      candleStore.setCandles([CANDLE_1, CANDLE_2]);
+    });
+    // Should re-seed via setData, not update
+    expect(setDataMock).toHaveBeenCalled();
+    expect(updateMock).not.toHaveBeenCalled();
   });
 });

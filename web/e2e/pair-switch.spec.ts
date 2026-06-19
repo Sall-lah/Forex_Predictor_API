@@ -79,3 +79,44 @@ test('pair switch: switching pair reloads history and reconnects WS', async ({ p
     timeout: 3_000,
   });
 });
+
+test('pair switch: no candles from previous pair remain on chart', async ({ page }) => {
+  await redirectWebSocketsToFixture(page);
+
+  await page.route('**/api/v1/subscriptions**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(SUBSCRIPTIONS),
+    });
+  });
+
+  await page.route('**/api/v1/historic-data/live**', async (route) => {
+    const url = new URL(route.request().url());
+    const pair = url.searchParams.get('pair') ?? 'BTC/USD';
+    const payload =
+      pair === 'ETH/USD'
+        ? historicResponseFor('ETH/USD', ethCandles)
+        : historicResponseFor('BTC/USD', btcCandles);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(payload),
+    });
+  });
+
+  await page.goto('/');
+  await expect(page.getByTestId('stat-close')).toHaveText(btcLastClose.toFixed(5));
+
+  // Switch the pair to ETH/USD
+  await page.getByTestId('pair-select').selectOption('ETH/USD');
+
+  // After switching, the close should match ETH's last close, not BTC's
+  await expect(page.getByTestId('stat-close')).toHaveText(ethLastClose.toFixed(5), {
+    timeout: 3_000,
+  });
+
+  // The close should NOT be the BTC close (verifying no carry-over)
+  const closeText = await page.getByTestId('stat-close').textContent();
+  expect(closeText).not.toBe(btcLastClose.toFixed(5));
+});

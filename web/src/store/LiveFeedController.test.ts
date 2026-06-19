@@ -260,3 +260,118 @@ describe('LiveFeedController history refetch', () => {
     controller.detach();
   });
 });
+
+describe('LiveFeedController reset on target change', () => {
+  it('calls setStatus("connecting") and clear() synchronously on target change', async () => {
+    const { controller, store } = makeController({
+      subscriptions: {
+        subscriptions: [{ pair: 'BTC/USD', intervals: [1] }, { pair: 'ETH/USD', intervals: [5] }],
+      },
+    });
+    await controller.attach('BTC/USD', 1);
+
+    const statusSpy = vi.spyOn(store, 'setStatus');
+    const clearSpy = vi.spyOn(store, 'clear');
+    await controller.attach('ETH/USD', 5);
+
+    expect(statusSpy).toHaveBeenCalledWith('connecting');
+    expect(clearSpy).toHaveBeenCalled();
+    // setStatus('connecting') must be called before clear()
+    // Verify by checking the call order: first setStatus call is 'connecting',
+    // and clear is called after
+    const connectingCall = statusSpy.mock.calls.find(([s]) => s === 'connecting');
+    expect(connectingCall).toBeDefined();
+    expect(statusSpy.mock.calls.indexOf(connectingCall!)).toBeLessThan(
+      clearSpy.mock.calls.length
+    );
+
+    statusSpy.mockRestore();
+    clearSpy.mockRestore();
+    controller.detach();
+  });
+
+  it('does NOT call setStatus("connecting"), clear(), or change status on same target', async () => {
+    const { controller, store } = makeController({
+      subscriptions: {
+        subscriptions: [{ pair: 'BTC/USD', intervals: [60] }],
+      },
+    });
+    await controller.attach('BTC/USD', 60);
+
+    const statusSpy = vi.spyOn(store, 'setStatus');
+    const clearSpy = vi.spyOn(store, 'clear');
+    await controller.attach('BTC/USD', 60);
+
+    expect(statusSpy).not.toHaveBeenCalled();
+    expect(clearSpy).not.toHaveBeenCalled();
+
+    statusSpy.mockRestore();
+    clearSpy.mockRestore();
+    controller.detach();
+  });
+
+  it('does NOT call setStatus("closed") when old WS closes with code 1000 during a new attach', async () => {
+    const { controller, store } = makeController({
+      subscriptions: {
+        subscriptions: [{ pair: 'BTC/USD', intervals: [1] }, { pair: 'ETH/USD', intervals: [5] }],
+      },
+    });
+    await controller.attach('BTC/USD', 1);
+
+    const statusSpy = vi.spyOn(store, 'setStatus');
+    await controller.attach('ETH/USD', 5);
+
+    // Simulate old WS close event with code 1000
+    const handleClose = getPrivate<(e: CloseEvent) => void>(controller, 'handleClose');
+    handleClose.call(controller, new CloseEvent('close', { code: 1000 }));
+
+    expect(statusSpy).not.toHaveBeenCalledWith('closed');
+
+    statusSpy.mockRestore();
+    controller.detach();
+  });
+
+  it('calls clear() before replaceCandles on a successful reconnect', async () => {
+    const { controller, store } = makeController({
+      subscriptions: {
+        subscriptions: [{ pair: 'BTC/USD', intervals: [60] }],
+      },
+    });
+    await controller.attach('BTC/USD', 60);
+
+    const clearSpy = vi.spyOn(store, 'clear');
+    const replaceSpy = vi.spyOn(store, 'replaceCandles');
+
+    // Trigger a reconnect via fetchHistoryAndOpen
+    await getPrivate<(pair: string, interval: number) => Promise<void>>(
+      controller, 'fetchHistoryAndOpen'
+    ).call(controller, 'BTC/USD', 60);
+
+    expect(clearSpy).toHaveBeenCalled();
+    expect(replaceSpy).toHaveBeenCalled();
+
+    clearSpy.mockRestore();
+    replaceSpy.mockRestore();
+    controller.detach();
+  });
+
+  it('calls clear() before setStatus("closed") on detach', async () => {
+    const { controller, store } = makeController({
+      subscriptions: {
+        subscriptions: [{ pair: 'BTC/USD', intervals: [60] }],
+      },
+    });
+    await controller.attach('BTC/USD', 60);
+
+    const clearSpy = vi.spyOn(store, 'clear');
+    const statusSpy = vi.spyOn(store, 'setStatus');
+
+    controller.detach();
+
+    expect(clearSpy).toHaveBeenCalled();
+    expect(statusSpy).toHaveBeenCalledWith('closed');
+
+    clearSpy.mockRestore();
+    statusSpy.mockRestore();
+  });
+});

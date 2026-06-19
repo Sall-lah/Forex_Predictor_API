@@ -7,7 +7,6 @@ Models:
 """
 
 from datetime import datetime
-from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -88,7 +87,7 @@ class HistoricDataResponse(BaseModel):
         ...,
         description="Number of OHLCV records",
     )
-    data: List[OHLCVRecord] = Field(
+    data: list[OHLCVRecord] = Field(
         ...,
         description="OHLCV candlestick records",
     )
