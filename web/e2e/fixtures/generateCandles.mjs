@@ -18,7 +18,7 @@ const INTERVAL = 60 * 60; // 1h
 const COUNT = 180;
 
 const candles = [];
-let lastClose = 1.08000;
+let lastClose = 1.08;
 for (let i = 0; i < COUNT; i += 1) {
   const time = START + i * INTERVAL;
   // Deterministic pseudo-random walk so the chart shows structure.

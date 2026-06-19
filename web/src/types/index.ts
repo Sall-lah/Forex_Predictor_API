@@ -6,21 +6,6 @@
  * module that owns it.
  */
 
-export interface PredictionProbabilities {
-  up: number;
-  down: number;
-  straight: number;
-}
-
-export interface PredictionResponse {
-  pair: string;
-  probability_up: number;
-  probability_down: number;
-  probability_straight: number;
-  computed_at: string;
-  valid_until: string;
-}
-
 export interface HealthResponse {
   status: string;
   service?: string;

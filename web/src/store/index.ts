@@ -22,4 +22,3 @@ candleStore.bindController(() => liveFeed.detach());
 export type { Candle, LiveStatus, Snapshot } from './types';
 export { CandleStore } from './CandleStore';
 export { LiveFeedController } from './LiveFeedController';
-export { selectCandles, selectLiveStatus } from './selectors';

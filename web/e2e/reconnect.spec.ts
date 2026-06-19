@@ -10,9 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { redirectWebSocketsToFixture, WS_FIXTURE_HTTP_URL } from './fixtures/wsHarness';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const candles = JSON.parse(
-  readFileSync(join(__dirname, 'fixtures/candles.json'), 'utf8')
-);
+const candles = JSON.parse(readFileSync(join(__dirname, 'fixtures/candles.json'), 'utf8'));
 
 const SUBSCRIPTIONS = {
   subscriptions: [

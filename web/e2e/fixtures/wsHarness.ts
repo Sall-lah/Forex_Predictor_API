@@ -28,11 +28,7 @@ export async function redirectWebSocketsToFixture(page: Page): Promise<void> {
   await page.addInitScript(
     ({ target, krakenUrl }) => {
       const original = window.WebSocket;
-      function PatchedWS(
-        this: WebSocket,
-        url: string | URL,
-        protocols?: string | string[]
-      ) {
+      function PatchedWS(this: WebSocket, url: string | URL, protocols?: string | string[]) {
         const asString = typeof url === 'string' ? url : url.toString();
         if (asString === krakenUrl || asString.startsWith(`${krakenUrl}/`)) {
           return new original(target, protocols);
@@ -49,6 +45,6 @@ export async function redirectWebSocketsToFixture(page: Page): Promise<void> {
       });
       (window as unknown as { WebSocket: unknown }).WebSocket = PatchedWS;
     },
-    { target: WS_FIXTURE_URL, krakenUrl: KRAKEN_WS_URL }
+    { target: WS_FIXTURE_URL, krakenUrl: KRAKEN_WS_URL },
   );
 }

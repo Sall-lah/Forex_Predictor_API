@@ -32,10 +32,7 @@ function normalise(candles: readonly Candle[]): readonly Candle[] {
   return Array.from(byTime.values()).sort((a, b) => a.time - b.time);
 }
 
-function candlesEqual(
-  a: readonly Candle[],
-  b: readonly Candle[]
-): boolean {
+function candlesEqual(a: readonly Candle[], b: readonly Candle[]): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
@@ -90,9 +87,7 @@ export class CandleStore {
         existingByTime.set(c.time, c);
       }
     }
-    const next = Array.from(existingByTime.values()).sort(
-      (a, b) => a.time - b.time
-    );
+    const next = Array.from(existingByTime.values()).sort((a, b) => a.time - b.time);
     if (candlesEqual(this.candles, next)) return;
     this.candles = next;
     this.lastUpdatedAt = Date.now();

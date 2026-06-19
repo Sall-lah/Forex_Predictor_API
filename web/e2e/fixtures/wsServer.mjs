@@ -34,13 +34,9 @@ import crypto from 'node:crypto';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.WS_FIXTURE_PORT) || 5180;
 
-const candles = JSON.parse(
-  readFileSync(join(__dirname, 'candles.json'), 'utf8')
-);
+const candles = JSON.parse(readFileSync(join(__dirname, 'candles.json'), 'utf8'));
 const lastCandle = candles[candles.length - 1];
-const lastCandleTime = Math.floor(
-  new Date(lastCandle.timestamp).getTime() / 1000
-);
+const lastCandleTime = Math.floor(new Date(lastCandle.timestamp).getTime() / 1000);
 
 const clients = new Set();
 
@@ -84,7 +80,8 @@ const server = http.createServer((req, res) => {
         res.end(JSON.stringify({ detail: 'close (number) is required' }));
         return;
       }
-      const symbol = typeof parsed.symbol === 'string' ? parsed.symbol : lastCandle.symbol || 'BTC/USD';
+      const symbol =
+        typeof parsed.symbol === 'string' ? parsed.symbol : lastCandle.symbol || 'BTC/USD';
       const interval = typeof parsed.interval === 'number' ? parsed.interval : 60;
       const timeSeconds =
         typeof parsed.time === 'number'

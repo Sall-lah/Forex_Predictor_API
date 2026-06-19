@@ -23,10 +23,7 @@ export interface UseCandlesResult {
 }
 
 export function useCandles(pair: string, interval: number): UseCandlesResult {
-  const snapshot: Snapshot = useSyncExternalStore(
-    candleStore.subscribe,
-    candleStore.getSnapshot
-  );
+  const snapshot: Snapshot = useSyncExternalStore(candleStore.subscribe, candleStore.getSnapshot);
 
   useEffect(() => {
     candleStore.clear();

@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import url("https://rsms.me/inter/inter.css");
+@import 'tailwindcss';
+@import url('https://rsms.me/inter/inter.css');
 
 @theme {
   --color-surface: #0e0e0e;
@@ -14,9 +14,9 @@
   --color-info: #7ab8ff;
   --color-warning: #f0b252;
 
-  --font-body: "Inter", sans-serif;
-  --font-headline: "Inter", sans-serif;
-  --font-label: "Inter", sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-headline: 'Inter', sans-serif;
+  --font-label: 'Inter', sans-serif;
 }
 
 @layer base {

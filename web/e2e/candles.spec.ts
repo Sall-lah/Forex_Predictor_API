@@ -12,9 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { redirectWebSocketsToFixture } from './fixtures/wsHarness';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const candles = JSON.parse(
-  readFileSync(join(__dirname, 'fixtures/candles.json'), 'utf8')
-);
+const candles = JSON.parse(readFileSync(join(__dirname, 'fixtures/candles.json'), 'utf8'));
 const lastClose = candles[candles.length - 1].close as number;
 
 const SUBSCRIPTIONS = {
@@ -52,9 +50,7 @@ test('initial render against the REST fixture', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('candles-page')).toBeVisible();
   await expect(page.getByTestId('chart-canvas')).toBeVisible();
-  await expect(page.getByTestId('stat-close')).toHaveText(
-    lastClose.toFixed(5)
-  );
+  await expect(page.getByTestId('stat-close')).toHaveText(lastClose.toFixed(5));
 });
 
 test('interval switch: switching from 1m to 5m only shows 5m candles', async ({ page }) => {

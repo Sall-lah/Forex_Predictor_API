@@ -15,12 +15,7 @@ export interface Candle {
   volume: number;
 }
 
-export type LiveStatus =
-  | 'idle'
-  | 'connecting'
-  | 'open'
-  | 'closed'
-  | 'reconnecting';
+export type LiveStatus = 'idle' | 'connecting' | 'open' | 'closed' | 'reconnecting';
 
 export interface Snapshot {
   readonly candles: readonly Candle[];

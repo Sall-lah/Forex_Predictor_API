@@ -24,9 +24,7 @@ const LARGE_VIEWPORT_PX = 1024;
 const HEIGHT_LARGE = 480;
 const HEIGHT_SMALL = 360;
 
-function snapshotToCandlestickData(
-  snapshot: Snapshot
-): readonly CandlestickData<Time>[] {
+function snapshotToCandlestickData(snapshot: Snapshot): readonly CandlestickData<Time>[] {
   const out: CandlestickData<Time>[] = [];
   for (const c of snapshot.candles) {
     out.push({
@@ -47,10 +45,7 @@ export const Chart: React.FC = () => {
   const lastTickTimeRef = useRef<number | null>(null);
   const initialisedRef = useRef(false);
 
-  const snapshot = useSyncExternalStore(
-    candleStore.subscribe,
-    candleStore.getSnapshot
-  );
+  const snapshot = useSyncExternalStore(candleStore.subscribe, candleStore.getSnapshot);
 
   // Build / teardown the chart instance whenever the container mounts.
   const setContainer = useCallback((node: HTMLDivElement | null) => {
@@ -82,7 +77,7 @@ export const Chart: React.FC = () => {
         horzLines: { color: colors.border },
       },
       rightPriceScale: { borderColor: colors.border },
-      timeScale: { borderColor: colors.border },
+      timeScale: { borderColor: colors.border, timeVisible: true, secondsVisible: false },
     });
     const series = chart.addCandlestickSeries({
       upColor: colors.bull,
@@ -173,11 +168,7 @@ export const Chart: React.FC = () => {
   }, [snapshot]);
 
   return (
-    <div
-      ref={setContainer}
-      data-testid="chart-canvas"
-      style={{ width: '100%', height: '100%' }}
-    />
+    <div ref={setContainer} data-testid="chart-canvas" style={{ width: '100%', height: '100%' }} />
   );
 };
 

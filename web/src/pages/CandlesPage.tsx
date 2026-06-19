@@ -9,37 +9,36 @@
 
 import { useEffect, useState } from 'react';
 import { Chart } from '../components/Chart';
+import { ErrorBoundary } from '../components/ErrorBoundary';
 import { StatusBar } from '../components/StatusBar';
 import { ReconnectingBanner } from '../components/ReconnectingBanner';
 import { useCandles } from '../hooks/useCandles';
 import { liveFeed } from '../store';
+import { STATUS_LABEL } from '../store/statusLabels';
 import { colors, spacing } from '../design/tokens';
 
-const SUPPORTED_PAIRS = ['BTC/USD', 'ETH/USD'] as const;
+const FALLBACK_PAIRS = ['BTC/USD', 'ETH/USD'] as const;
 const SUPPORTED_INTERVALS = [1, 5, 15, 60, 240] as const;
 
-type SupportedPair = (typeof SUPPORTED_PAIRS)[number];
 type SupportedInterval = (typeof SUPPORTED_INTERVALS)[number];
 
 export const CandlesPage: React.FC = () => {
-  const [pair, setPair] = useState<SupportedPair>('BTC/USD');
+  const [pair, setPair] = useState('BTC/USD');
   const [interval, setInterval] = useState<SupportedInterval>(60);
+  const [availablePairs, setAvailablePairs] = useState<string[]>([...FALLBACK_PAIRS]);
 
   const { status } = useCandles(pair, interval);
   const isLive = status === 'open';
 
   const controlsLabel =
-    status === 'idle'
+    status === 'open' || status === 'idle'
       ? null
-      : status === 'connecting'
-        ? 'Connecting…'
-        : status === 'reconnecting'
-          ? 'Reconnecting…'
-          : status === 'closed'
-            ? 'Closed'
-            : null;
+      : status === 'closed'
+        ? 'Closed'
+        : `${STATUS_LABEL[status]}…`;
 
   useEffect(() => {
+    void liveFeed.getAvailablePairs().then(setAvailablePairs);
     return () => {
       liveFeed.detach();
     };
@@ -89,11 +88,11 @@ export const CandlesPage: React.FC = () => {
             aria-label="pair"
             data-testid="pair-select"
             value={pair}
-            onChange={(e) => setPair(e.target.value as SupportedPair)}
+            onChange={(e) => setPair(e.target.value)}
             disabled={!isLive}
             style={isLive ? selectStyle : disabledSelectStyle}
           >
-            {SUPPORTED_PAIRS.map((p) => (
+            {availablePairs.map((p) => (
               <option key={p} value={p}>
                 {p}
               </option>
@@ -103,9 +102,7 @@ export const CandlesPage: React.FC = () => {
             aria-label="interval"
             data-testid="interval-select"
             value={interval}
-            onChange={(e) =>
-              setInterval(Number(e.target.value) as SupportedInterval)
-            }
+            onChange={(e) => setInterval(Number(e.target.value) as SupportedInterval)}
             disabled={!isLive}
             style={isLive ? selectStyle : disabledSelectStyle}
           >
@@ -135,10 +132,7 @@ export const CandlesPage: React.FC = () => {
 
       <ReconnectingBanner />
 
-      <div
-        data-testid="status-bar-container"
-        style={{ marginBottom: spacing.md }}
-      >
+      <div data-testid="status-bar-container" style={{ marginBottom: spacing.md }}>
         <StatusBar pair={pair} interval={interval} />
       </div>
 
@@ -153,7 +147,9 @@ export const CandlesPage: React.FC = () => {
           minHeight: 360,
         }}
       >
-        <Chart />
+        <ErrorBoundary>
+          <Chart />
+        </ErrorBoundary>
       </section>
 
       <footer

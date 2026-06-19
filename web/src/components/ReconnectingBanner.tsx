@@ -8,10 +8,7 @@ import { candleStore } from '../store';
 import { colors, fontSizes, fontWeights, spacing } from '../design/tokens';
 
 export const ReconnectingBanner: React.FC = () => {
-  const status = useSyncExternalStore(
-    candleStore.subscribe,
-    candleStore.getSnapshot
-  ).status;
+  const status = useSyncExternalStore(candleStore.subscribe, candleStore.getSnapshot).status;
 
   if (status !== 'reconnecting') return null;
 

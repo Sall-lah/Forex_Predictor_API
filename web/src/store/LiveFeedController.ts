@@ -70,13 +70,11 @@ export class LiveFeedController {
   private silenceTimer: ReturnType<typeof setTimeout> | null = null;
   private subscriptionsPromise: Promise<SubscriptionResponse> | null = null;
   private destroyed = false;
-  private fetchOverride:
-    | (<T>(endpoint: string) => Promise<T>)
-    | null = null;
+  private fetchOverride: (<T>(endpoint: string) => Promise<T>) | null = null;
 
   constructor(
     store: CandleStore,
-    options: { fetchOverride?: <T>(endpoint: string) => Promise<T> } = {}
+    options: { fetchOverride?: <T>(endpoint: string) => Promise<T> } = {},
   ) {
     this.store = store;
     this.fetchOverride = options.fetchOverride ?? null;
@@ -85,9 +83,7 @@ export class LiveFeedController {
   attach(pair: string, interval: number): Promise<void> {
     this.destroyed = false;
     const sameTarget =
-      this.activePair === pair &&
-      this.activeInterval === interval &&
-      this.currentSocket !== null;
+      this.activePair === pair && this.activeInterval === interval && this.currentSocket !== null;
     if (sameTarget) return Promise.resolve();
 
     this.store.setStatus('connecting');
@@ -110,19 +106,26 @@ export class LiveFeedController {
     this.store.setStatus('closed');
   }
 
+  async getAvailablePairs(): Promise<string[]> {
+    try {
+      const subs = await this.fetchSubscriptions();
+      return subs.subscriptions.map((s) => s.pair);
+    } catch {
+      return ['BTC/USD', 'ETH/USD'];
+    }
+  }
+
   private async bootstrap(pair: string, interval: number): Promise<void> {
     try {
       const subs = await this.fetchSubscriptions();
       const valid = subs.subscriptions.some(
-        (s) => s.pair === pair && s.intervals.includes(interval)
+        (s) => s.pair === pair && s.intervals.includes(interval),
       );
       if (!valid) {
         if (this.destroyed || this.activePair !== pair || this.activeInterval !== interval) {
           return;
         }
-        console.warn(
-          `live-feed: pair/interval not configured on backend: ${pair}@${interval}m`
-        );
+        console.warn(`live-feed: pair/interval not configured on backend: ${pair}@${interval}m`);
       }
     } catch (error) {
       // Treat subscription discovery failure as non-fatal: still
@@ -222,10 +225,29 @@ export class LiveFeedController {
             symbol: [this.activePair],
             interval: this.activeInterval,
           },
-        })
+        }),
       );
     } catch {
       // ignore — the close handler will schedule a reconnect
+    }
+  }
+
+  private sendUnsubscribe(): void {
+    if (!this.currentSocket || this.currentSocket.readyState !== WebSocket.OPEN) return;
+    if (!this.activePair || this.activeInterval === null) return;
+    try {
+      this.currentSocket.send(
+        JSON.stringify({
+          method: 'unsubscribe',
+          params: {
+            channel: 'ohlc',
+            symbol: [this.activePair],
+            interval: this.activeInterval,
+          },
+        }),
+      );
+    } catch {
+      // ignore — the socket is about to be closed
     }
   }
 
@@ -241,6 +263,14 @@ export class LiveFeedController {
       data?: unknown;
     };
     if (message.channel === 'ohlc' && message.type === 'update' && Array.isArray(message.data)) {
+      const record = message.data[0] as { symbol?: string } | undefined;
+      if (record?.symbol && this.activePair) {
+        const tickSymbol = normalizeSymbol(record.symbol);
+        const activeSymbol = normalizeSymbol(this.activePair);
+        if (tickSymbol !== activeSymbol) {
+          return;
+        }
+      }
       const candle = parseKrakenOhlc(message.data[0]);
       if (candle) {
         console.log('[ws] OHLC tick', candle);
@@ -275,7 +305,10 @@ export class LiveFeedController {
       this.store.replaceCandles(candles);
       console.log(`[ws] history loaded: ${candles.length} candles for ${pair}@${interval}m`);
     } catch (error) {
-      console.warn(`[ws] history fetch failed for ${pair}@${interval}m, continuing with WS only`, error);
+      console.warn(
+        `[ws] history fetch failed for ${pair}@${interval}m, continuing with WS only`,
+        error,
+      );
     }
 
     if (this.destroyed || this.activePair !== pair || this.activeInterval !== interval) {
@@ -298,14 +331,12 @@ export class LiveFeedController {
   private async fetchSubscriptions(): Promise<SubscriptionResponse> {
     if (!this.subscriptionsPromise) {
       const fetcher = this.fetchOverride ?? defaultFetch;
-      this.subscriptionsPromise = fetcher<SubscriptionResponse>('/subscriptions').catch(
-        (error) => {
-          // Reset so a future attach() retries rather than reusing
-          // a permanently-failed promise.
-          this.subscriptionsPromise = null;
-          throw error;
-        }
-      );
+      this.subscriptionsPromise = fetcher<SubscriptionResponse>('/subscriptions').catch((error) => {
+        // Reset so a future attach() retries rather than reusing
+        // a permanently-failed promise.
+        this.subscriptionsPromise = null;
+        throw error;
+      });
     }
     return this.subscriptionsPromise;
   }
@@ -339,6 +370,7 @@ export class LiveFeedController {
   private detachSocket(code: number): void {
     if (!this.currentSocket) return;
     const ws = this.currentSocket;
+    this.sendUnsubscribe();
     ws.removeEventListener('open', this.handleOpen);
     ws.removeEventListener('message', this.handleMessage as EventListener);
     ws.removeEventListener('close', this.handleClose);
@@ -419,4 +451,8 @@ function numberOrNull(value: unknown): number | null {
     if (Number.isFinite(parsed)) return parsed;
   }
   return null;
+}
+
+function normalizeSymbol(pair: string): string {
+  return pair.replace(/\//g, '');
 }

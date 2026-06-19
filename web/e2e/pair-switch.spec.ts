@@ -9,14 +9,10 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  redirectWebSocketsToFixture,
-} from './fixtures/wsHarness';
+import { redirectWebSocketsToFixture } from './fixtures/wsHarness';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const btcCandles = JSON.parse(
-  readFileSync(join(__dirname, 'fixtures/candles.json'), 'utf8')
-);
+const btcCandles = JSON.parse(readFileSync(join(__dirname, 'fixtures/candles.json'), 'utf8'));
 const ethCandles = btcCandles.map((c) => ({
   ...c,
   symbol: 'ETH/USD',

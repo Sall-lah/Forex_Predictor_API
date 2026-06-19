@@ -15,11 +15,7 @@ async function parseDetail(response: Response): Promise<string> {
   const fallback = response.statusText || `HTTP ${response.status}`;
   try {
     const data: unknown = await response.clone().json();
-    if (
-      data !== null &&
-      typeof data === 'object' &&
-      'detail' in data
-    ) {
+    if (data !== null && typeof data === 'object' && 'detail' in data) {
       const detail = (data as { detail: unknown }).detail;
       if (typeof detail === 'string') return detail;
       try {

@@ -28,14 +28,8 @@ function formatPrice(value: number | null): string {
   return value.toFixed(5);
 }
 
-export const StatusBar: React.FC<{ pair: string; interval: number }> = ({
-  pair,
-  interval,
-}) => {
-  const snapshot = useSyncExternalStore(
-    candleStore.subscribe,
-    candleStore.getSnapshot
-  );
+export const StatusBar: React.FC<{ pair: string; interval: number }> = ({ pair, interval }) => {
+  const snapshot = useSyncExternalStore(candleStore.subscribe, candleStore.getSnapshot);
   const last = pickLatest(snapshot.candles);
 
   return (

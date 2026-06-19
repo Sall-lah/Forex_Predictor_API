@@ -13,5 +13,5 @@ if (!root) {
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
     <CandlesPage />
-  </React.StrictMode>
+  </React.StrictMode>,
 );

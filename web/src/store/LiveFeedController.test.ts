@@ -24,11 +24,13 @@ function getPrivate<T>(obj: object, key: string): T {
 
 type DispatchFn = (payload: unknown) => void;
 
-function makeController(opts: {
-  subscriptions?: unknown;
-  history?: unknown;
-  historyError?: Error;
-} = {}) {
+function makeController(
+  opts: {
+    subscriptions?: unknown;
+    history?: unknown;
+    historyError?: Error;
+  } = {},
+) {
   const store = new CandleStore();
   const calls: string[] = [];
   const fetchOverride = vi.fn(async <T>(endpoint: string): Promise<T> => {
@@ -75,9 +77,7 @@ describe('LiveFeedController.dispatch (Kraken v2)', () => {
     expect(applySpy).toHaveBeenCalledTimes(1);
     const applied = applySpy.mock.calls[0]?.[0];
     expect(applied).toBeDefined();
-    expect(applied!.time).toBe(
-      Math.floor(new Date('2024-01-01T00:01:00.000Z').getTime() / 1000)
-    );
+    expect(applied!.time).toBe(Math.floor(new Date('2024-01-01T00:01:00.000Z').getTime() / 1000));
     expect(applied!.open).toBe(100.0);
     expect(applied!.high).toBe(105.5);
     expect(applied!.low).toBe(99.5);
@@ -265,7 +265,10 @@ describe('LiveFeedController reset on target change', () => {
   it('calls setStatus("connecting") and clear() synchronously on target change', async () => {
     const { controller, store } = makeController({
       subscriptions: {
-        subscriptions: [{ pair: 'BTC/USD', intervals: [1] }, { pair: 'ETH/USD', intervals: [5] }],
+        subscriptions: [
+          { pair: 'BTC/USD', intervals: [1] },
+          { pair: 'ETH/USD', intervals: [5] },
+        ],
       },
     });
     await controller.attach('BTC/USD', 1);
@@ -281,9 +284,7 @@ describe('LiveFeedController reset on target change', () => {
     // and clear is called after
     const connectingCall = statusSpy.mock.calls.find(([s]) => s === 'connecting');
     expect(connectingCall).toBeDefined();
-    expect(statusSpy.mock.calls.indexOf(connectingCall!)).toBeLessThan(
-      clearSpy.mock.calls.length
-    );
+    expect(statusSpy.mock.calls.indexOf(connectingCall!)).toBeLessThan(clearSpy.mock.calls.length);
 
     statusSpy.mockRestore();
     clearSpy.mockRestore();
@@ -313,7 +314,10 @@ describe('LiveFeedController reset on target change', () => {
   it('does NOT call setStatus("closed") when old WS closes with code 1000 during a new attach', async () => {
     const { controller, store } = makeController({
       subscriptions: {
-        subscriptions: [{ pair: 'BTC/USD', intervals: [1] }, { pair: 'ETH/USD', intervals: [5] }],
+        subscriptions: [
+          { pair: 'BTC/USD', intervals: [1] },
+          { pair: 'ETH/USD', intervals: [5] },
+        ],
       },
     });
     await controller.attach('BTC/USD', 1);
@@ -344,7 +348,8 @@ describe('LiveFeedController reset on target change', () => {
 
     // Trigger a reconnect via fetchHistoryAndOpen
     await getPrivate<(pair: string, interval: number) => Promise<void>>(
-      controller, 'fetchHistoryAndOpen'
+      controller,
+      'fetchHistoryAndOpen',
     ).call(controller, 'BTC/USD', 60);
 
     expect(clearSpy).toHaveBeenCalled();
@@ -373,5 +378,97 @@ describe('LiveFeedController reset on target change', () => {
 
     clearSpy.mockRestore();
     statusSpy.mockRestore();
+  });
+});
+
+describe('LiveFeedController instrument-switch tick filtering', () => {
+  it('discards an OHLC tick whose symbol does not match the active pair', async () => {
+    const { store, controller } = makeController({
+      subscriptions: {
+        subscriptions: [
+          { pair: 'BTC/USD', intervals: [60] },
+          { pair: 'ETH/USD', intervals: [60] },
+        ],
+      },
+    });
+    await controller.attach('BTC/USD', 60);
+    const applySpy = vi.spyOn(store, 'applyTick');
+
+    getPrivate<DispatchFn>(controller, 'dispatch').call(controller, {
+      channel: 'ohlc',
+      type: 'update',
+      data: [
+        {
+          symbol: 'ETH/USD',
+          interval: 60,
+          interval_begin: '2024-01-01T00:01:00.000Z',
+          open: '2000',
+          high: '2050',
+          low: '1980',
+          close: '2025',
+          volume: '10',
+        },
+      ],
+    });
+
+    expect(applySpy).not.toHaveBeenCalled();
+    applySpy.mockRestore();
+    controller.detach();
+  });
+
+  it('applies an OHLC tick whose symbol matches the active pair', async () => {
+    const { store, controller } = makeController({
+      subscriptions: {
+        subscriptions: [{ pair: 'BTC/USD', intervals: [60] }],
+      },
+    });
+    await controller.attach('BTC/USD', 60);
+    const applySpy = vi.spyOn(store, 'applyTick');
+
+    getPrivate<DispatchFn>(controller, 'dispatch').call(controller, {
+      channel: 'ohlc',
+      type: 'update',
+      data: [
+        {
+          symbol: 'BTC/USD',
+          interval: 60,
+          interval_begin: '2024-01-01T00:01:00.000Z',
+          open: '40000',
+          high: '40500',
+          low: '39800',
+          close: '40250',
+          volume: '5',
+        },
+      ],
+    });
+
+    expect(applySpy).toHaveBeenCalledTimes(1);
+    applySpy.mockRestore();
+    controller.detach();
+  });
+});
+
+describe('LiveFeedController unsubscribe on instrument switch', () => {
+  it('sends an unsubscribe message before closing the socket on attach', async () => {
+    const { controller } = makeController({
+      subscriptions: {
+        subscriptions: [
+          { pair: 'BTC/USD', intervals: [60] },
+          { pair: 'ETH/USD', intervals: [60] },
+        ],
+      },
+    });
+    await controller.attach('BTC/USD', 60);
+
+    const sendUnsubscribeSpy = vi.spyOn(
+      controller as unknown as { sendUnsubscribe: () => void },
+      'sendUnsubscribe',
+    );
+
+    await controller.attach('ETH/USD', 60);
+
+    expect(sendUnsubscribeSpy).toHaveBeenCalled();
+    sendUnsubscribeSpy.mockRestore();
+    controller.detach();
   });
 });

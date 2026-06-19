@@ -10,9 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { redirectWebSocketsToFixture, WS_FIXTURE_HTTP_URL } from './fixtures/wsHarness';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const candles = JSON.parse(
-  readFileSync(join(__dirname, 'fixtures/candles.json'), 'utf8')
-);
+const candles = JSON.parse(readFileSync(join(__dirname, 'fixtures/candles.json'), 'utf8'));
 const lastClose = candles[candles.length - 1].close as number;
 const bumpedClose = lastClose + 0.001;
 
@@ -58,8 +56,7 @@ test('live tick: status bar updates within 1 s', async ({ page }) => {
   expect(pushRes.status()).toBe(204);
 
   // Status bar should reflect the bumped close within 1 s.
-  await expect(page.getByTestId('stat-close')).toHaveText(
-    bumpedClose.toFixed(5),
-    { timeout: 1_000 }
-  );
+  await expect(page.getByTestId('stat-close')).toHaveText(bumpedClose.toFixed(5), {
+    timeout: 1_000,
+  });
 });

@@ -42,7 +42,7 @@ export function usePrediction(pair: string): UsePredictionResult {
   const { data, error, isLoading } = useSWR<PredictionResponse>(
     pair ? `prediction|${pair}` : null,
     fetcher,
-    { refreshInterval: 10_000 }
+    { refreshInterval: 10_000 },
   );
 
   const computedAt = data?.computed_at ? new Date(data.computed_at) : null;
