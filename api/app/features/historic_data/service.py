@@ -1,25 +1,23 @@
 """Service layer orchestration for historic OHLCV data retrieval."""
 
-import logging
-
+from app.core.base import BaseService
 from app.features.historic_data.schemas import HistoricDataRequest, HistoricDataResponse, OHLCVRecord
-from app.shared.ohlcv import OHLCVDataFrame, DataProvider, get_provider
-
-logger = logging.getLogger(__name__)
+from app.shared.ohlcv import OHLCVDataFrame, KrakenRepository
 
 
-class HistoricDataService:
+class HistoricDataService(BaseService):
     """Coordinates Historic Data workflows."""
 
-    def __init__(self, api_client: DataProvider | None = None) -> None:
+    def __init__(self, api_client: KrakenRepository | None = None) -> None:
         """Inject dependencies or instantiate defaults."""
-        self.api_client = api_client or get_provider()
+        super().__init__()
+        self.api_client = api_client or KrakenRepository()
 
     async def get_live_data(
         self, request: HistoricDataRequest
     ) -> HistoricDataResponse:
         """Fetch, normalize, and return recent OHLCV data."""
-        logger.info(f"Fetching {request.count} periods for {request.pair}")
+        self.logger.info(f"Fetching {request.count} periods for {request.pair}")
 
         payload = await self.api_client.fetch_ohlcv_data(
             pair=request.pair,
@@ -32,7 +30,7 @@ class HistoricDataService:
 
         records = [OHLCVRecord(**row) for row in ohlcv_data.to_records()]
 
-        logger.info(
+        self.logger.info(
             "Fetched data for '%s' — %d candles (interval: %dm)",
             request.pair,
             len(records),

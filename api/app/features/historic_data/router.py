@@ -7,6 +7,7 @@ Endpoints:
 
 from fastapi import APIRouter, Depends, Query
 
+from app.core.registry import get_registry
 from app.features.historic_data.schemas import HistoricDataRequest, HistoricDataResponse
 from app.features.historic_data.service import HistoricDataService
 
@@ -17,10 +18,16 @@ def get_service() -> HistoricDataService:
     """
     Dependency injection factory for HistoricDataService.
 
+    Tries registry first, falls back to direct instantiation for test compatibility.
+
     Returns:
-        New HistoricDataService instance
+        HistoricDataService instance
     """
-    return HistoricDataService()
+    try:
+        registry = get_registry()
+        return registry.resolve(HistoricDataService)
+    except KeyError:
+        return HistoricDataService()
 
 
 @router.get(

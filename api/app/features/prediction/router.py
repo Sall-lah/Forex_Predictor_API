@@ -7,6 +7,7 @@ Endpoints:
 
 from fastapi import APIRouter, Depends
 
+from app.core.registry import get_registry
 from app.features.prediction.schemas import PredictionRequest, PredictionResponse
 from app.features.prediction.service import PredictionService
 
@@ -17,10 +18,16 @@ def get_prediction_service() -> PredictionService:
     """
     Dependency injection factory for PredictionService.
 
+    Tries registry first, falls back to direct instantiation for test compatibility.
+
     Returns:
         PredictionService instance
     """
-    return PredictionService()
+    try:
+        registry = get_registry()
+        return registry.resolve(PredictionService)
+    except KeyError:
+        return PredictionService()
 
 
 @router.post("/predict", response_model=PredictionResponse)

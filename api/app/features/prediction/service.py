@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 from ta import momentum, trend, volatility
 
+from app.core.base import BaseService
 from app.core.config import get_settings
 from app.core.exceptions import (
     DataFetchError,
@@ -31,7 +32,7 @@ from app.core.exceptions import (
     InsufficientDataError,
 )
 from app.features.prediction.schemas import PredictionRequest, PredictionResponse
-from app.shared.ohlcv import KrakenProvider, OHLCVDataFrame
+from app.shared.ohlcv import KrakenRepository, OHLCVDataFrame, get_repository
 
 settings = get_settings()
 
@@ -414,7 +415,7 @@ class OHLCVPreprocessor:
         return df
 
 
-class PredictionService:
+class PredictionService(BaseService):
     """
     Business logic orchestrator for forex predictions.
 
@@ -428,11 +429,12 @@ class PredictionService:
 
     def __init__(
         self,
-        api_client: KrakenProvider | None = None,
+        api_client: KrakenRepository | None = None,
         model_loader: ModelLoader | None = None,
         preprocessor: OHLCVPreprocessor | None = None,
     ):
-        self.api_client = api_client or KrakenProvider()
+        super().__init__()
+        self.api_client = api_client or get_repository()
         self.model_loader = model_loader or ModelLoader()
         self.preprocessor = preprocessor or OHLCVPreprocessor()
         
@@ -471,7 +473,7 @@ class PredictionService:
         if cached:
             return cached
 
-        logger.info("Loading LightGBM model")
+        self.logger.info("Loading LightGBM model")
         model = self.model_loader.get_model()
         if not hasattr(model, "predict_proba"):
             raise ModelNotLoadedError("Model missing predict_proba method")
@@ -480,13 +482,13 @@ class PredictionService:
         feature_df = self._extract_features(historic_df, normalized_pair)
         latest_features = self._select_latest_feature_row(feature_df)
         
-        logger.info("Aligning features to model schema")
+        self.logger.info("Aligning features to model schema")
         required_features = self._resolve_model_feature_names(model)
         aligned_features = self._align_and_validate_features(
             latest_features, required_features
         )
 
-        logger.info("Making prediction for '%s'", normalized_pair)
+        self.logger.info("Making prediction for '%s'", normalized_pair)
         probabilities = self._execute_inference(model, aligned_features)
         prob_straight, prob_up, prob_down = self._extract_probabilities(probabilities)
 
@@ -503,13 +505,13 @@ class PredictionService:
         return response
 
     async def _fetch_historic_dataframe(self, normalized_pair: str) -> pd.DataFrame:
-        logger.info("Fetching OHLCV data for '%s'", normalized_pair)
+        self.logger.info("Fetching OHLCV data for '%s'", normalized_pair)
         payload = await self.api_client.fetch_ohlcv_data(
             normalized_pair, count=720, interval=60
         )
         ohlcv_data = OHLCVDataFrame.from_provider_response(payload)
 
-        logger.info(
+        self.logger.info(
             "Fetched %d candles for '%s' (interval: 60m)",
             len(ohlcv_data.df),
             normalized_pair,
@@ -517,9 +519,9 @@ class PredictionService:
         return ohlcv_data.df
 
     def _extract_features(self, df: pd.DataFrame, normalized_pair: str) -> pd.DataFrame:
-        logger.info("Extracting features for '%s'", normalized_pair)
+        self.logger.info("Extracting features for '%s'", normalized_pair)
         features = self.preprocessor.extract_features(df)
-        logger.info(
+        self.logger.info(
             "Feature extraction completed: %d rows, %d features",
             len(features),
             len(features.columns),

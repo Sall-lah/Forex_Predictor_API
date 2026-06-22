@@ -21,6 +21,9 @@ from app.core.exceptions import (
     InsufficientDataError,
     ModelNotLoadedError,
 )
+from app.core.registry import get_registry
+from app.features.prediction.service import PredictionService
+from app.features.historic_data.service import HistoricDataService
 from app.api.router import api_router
 
 settings = get_settings()
@@ -37,8 +40,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     Application startup/shutdown lifecycle.
 
-    No background services to manage — the backend is a pure REST API.
+    Registers services in the registry during startup.
     """
+    registry = get_registry()
+    registry.register(PredictionService, lambda: PredictionService())
+    registry.register(HistoricDataService, lambda: HistoricDataService())
+    logger.info("Services registered in registry")
+    
     logger.info("Lifespan: startup complete")
     try:
         yield
